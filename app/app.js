@@ -226,6 +226,7 @@
         <span class="muted">${esc(t.description || '')}</span>
         <span>${(t.types || []).map((ty) => `<span class="badge">${esc((St.DOC_TYPES[ty] || {}).label || ty)}</span>`).join('')}${(t.sizes || []).map((x) => `<span class="badge">${esc(x)}</span>`).join('')}</span>
         ${t.id === settings.defaults.templateId ? '<span class="badge default">الافتراضي</span>' : ''}
+        ${t.builtin ? '' : '<span class="tpl-del" data-del="' + esc(t.id) + '" title="حذف القالب من المجلد">حذف</span>'}
       </button>`).join('');
     const tpl = currentTemplate();
     $('#pv-type').innerHTML = (tpl.types || []).map((k) => `<option value="${k}">${esc(St.DOC_TYPES[k].label)}</option>`).join('');
@@ -320,7 +321,30 @@
     if (b) archiveAction(b.dataset.act, b.closest('tr').dataset.path).catch((err) => toast(err.message, true));
   });
   $('#btn-archive-refresh').addEventListener('click', () => renderArchive(true));
-  $('#templates-list').addEventListener('click', (e) => {
+  $('#tpl-import').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const json = JSON.parse(await f.text());
+      const exists = (await St.listTemplates()).find((t) => t.id === json.id && !t.builtin);
+      if (exists && !confirm(`يوجد قالب بنفس المعرّف (${json.id}). تريد استبداله؟`)) return;
+      await St.saveTemplate(json);
+      pv.templateId = json.id; pv.theme = null;
+      toast('تم استيراد القالب: ' + (json.name || json.id));
+      renderTemplates();
+    } catch (err) { toast('تعذّر استيراد القالب: ' + err.message, true); }
+  });
+  $('#templates-list').addEventListener('click', async (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      e.stopPropagation();
+      if (!confirm('حذف هذا القالب من مجلد العمل؟ المستندات المحفوظة به تبقى، لكنها تُطبع بقالب آخر.')) return;
+      await St.deleteTemplate(del.dataset.del);
+      if (pv.templateId === del.dataset.del) pv.templateId = null;
+      toast('تم حذف القالب');
+      return renderTemplates();
+    }
     const b = e.target.closest('.tpl');
     if (!b) return;
     pv.templateId = b.dataset.id; pv.theme = null;

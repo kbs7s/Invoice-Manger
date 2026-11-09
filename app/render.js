@@ -93,14 +93,16 @@
     const d = doc.data || {};
     if (doc.type === 'receipt') {
       const amount = num(d.amount);
-      return { subtotal: amount, discount: 0, net: amount, paid: amount, remaining: 0, total: amount };
+      return { subtotal: amount, discount: 0, net: amount, prevBalance: 0, grand: amount, paid: amount, remaining: 0, total: amount };
     }
     const items = (d.items || []).filter((it) => it && (it.name || num(it.qty) || num(it.price)));
     const subtotal = items.reduce((s, it) => s + num(it.qty) * num(it.price), 0);
     const discount = num(d.discount);
     const net = subtotal - discount;
+    const prevBalance = num(d.prevBalance);           // رصيد / طلب سابق على الزبون
+    const grand = net + prevBalance;                   // المطلوب الكلي
     const paid = d.paid === '' || d.paid == null ? net : num(d.paid);
-    return { subtotal, discount, net, paid, remaining: net - paid, total: net };
+    return { subtotal, discount, net, prevBalance, grand, paid, remaining: grand - paid, total: net };
   }
 
   // ---------- أجزاء مشتركة بين القوالب ----------
@@ -123,6 +125,108 @@
   }
 
   const h = { esc, num, fmt, money, icons: ICONS, logo: logoHTML, watermark: watermarkHTML, tafqeet };
+
+  // ---------- القوالب المستوردة (ملف JSON بدون كود) ----------
+  /*
+   * صيغة القالب المستورد:
+   *   { "id": "my-invoice", "name": "...", "types": ["sales"], "sizes": ["A4","A5"],
+   *     "minRows": 10, "theme": { "primary": "#..", "dark": "#..", "accent": "#.." },
+   *     "css": ".tpl-my-invoice .x { ... }",
+   *     "html": "<div class='doc'> {{company.name}} ... {{#items}}<tr><td>{{i}}</td><td>{{name}}</td></tr>{{/items}} ..." }
+   * الوسوم: {{x}} نص، {{{x}}} HTML (مثل logo)، {{#x}}...{{/x}} تكرار أو شرط، {{^x}}...{{/x}} إذا كان فارغاً.
+   */
+  function lookup(stack, key) {
+    if (key === '.') return stack[stack.length - 1];
+    for (let i = stack.length - 1; i >= 0; i--) {
+      let v = stack[i];
+      let ok = true;
+      for (const part of key.split('.')) {
+        if (v != null && typeof v === 'object' && part in v) v = v[part];
+        else { ok = false; break; }
+      }
+      if (ok) return v;
+    }
+    return undefined;
+  }
+
+  function mustache(tplStr, view) {
+    function run(str, stack) {
+      let out = '';
+      let i = 0;
+      const re = /\{\{(\{?)([#^\/]?)\s*([\w.]+)\s*\}?\}\}/g;
+      let m;
+      re.lastIndex = 0;
+      while ((m = re.exec(str))) {
+        out += str.slice(i, m.index);
+        const [all, raw, kind, key] = m;
+        if (kind === '#' || kind === '^') {
+          // نبحث عن الإغلاق المطابق مع مراعاة التداخل
+          const open = new RegExp('\\{\\{\\s*[#^]\\s*' + key.replace('.', '\\.') + '\\s*\\}\\}|\\{\\{\\s*\\/\\s*' + key.replace('.', '\\.') + '\\s*\\}\\}', 'g');
+          open.lastIndex = re.lastIndex;
+          let depth = 1, mm, end = -1, endLen = 0;
+          while ((mm = open.exec(str))) {
+            if (mm[0].includes('/')) { if (--depth === 0) { end = mm.index; endLen = mm[0].length; break; } }
+            else depth++;
+          }
+          if (end < 0) throw new Error('وسم غير مغلق: ' + key);
+          const inner = str.slice(re.lastIndex, end);
+          const v = lookup(stack, key);
+          const truthy = Array.isArray(v) ? v.length > 0 : !!v;
+          if (kind === '#') {
+            if (Array.isArray(v)) out += v.map((x) => run(inner, stack.concat([x]))).join('');
+            else if (truthy) out += run(inner, typeof v === 'object' ? stack.concat([v]) : stack);
+          } else if (!truthy) out += run(inner, stack);
+          i = re.lastIndex = end + endLen;
+          continue;
+        }
+        if (kind === '/') { i = re.lastIndex; continue; }
+        const v = lookup(stack, key);
+        out += raw ? (v == null ? '' : String(v)) : esc(v);
+        i = re.lastIndex;
+      }
+      return out + str.slice(i);
+    }
+    return run(tplStr, [view]);
+  }
+
+  function viewFor(ctx, minRows) {
+    const { data, totals: t, currency, blank } = ctx;
+    const m = (x) => (blank ? '' : money(x, currency));
+    const items = (blank ? [] : (data.items || [])).map((it, i) => ({
+      i: i + 1, name: it.name, notes: it.notes, unit: it.unit, qty: it.qty, pack: it.pack,
+      price: fmt(it.price, currency), total: fmt(num(it.qty) * num(it.price), currency),
+    }));
+    const emptyRows = [];
+    for (let k = items.length; k < (minRows || 0); k++) emptyRows.push({ i: k + 1 });
+    const v = (x) => (blank ? '' : x);
+    return {
+      company: ctx.company, title: ctx.title, number: ctx.number, copyLabel: ctx.copyLabel,
+      date: v(ctx.doc.date), blank,
+      logo: logoHTML(ctx.company, 'logo'), watermark: watermarkHTML(ctx.company, ctx.watermark),
+      icons: ICONS, symbol: currency_symbol(currency),
+      customer: v(data.customer), customerAddress: v(data.customerAddress), customerPhone: v(data.customerPhone),
+      paymentMethod: v(data.paymentMethod), transactionType: v(data.transactionType),
+      purpose: v(data.purpose), notes: v(data.notes), terms: data.terms, receiver: v(data.receiver), accountant: v(data.accountant),
+      items, emptyRows, itemCount: blank ? '' : items.reduce((s, it) => s + num(it.qty), 0),
+      subtotal: m(t.subtotal), discount: m(t.discount), net: m(t.net), prevBalance: m(t.prevBalance),
+      hasPrev: !!t.prevBalance, grand: m(t.grand), paid: m(t.paid), remaining: m(t.remaining), total: m(t.total),
+      amount: m(t.total), words: ctx.words, isSales: ctx.type === 'sales', isReceipt: ctx.type === 'receipt',
+    };
+  }
+  function currency_symbol(code) { return currency(code).symbol; }
+
+  /** يحوّل قالباً مستورداً (JSON) إلى قالب قابل للرسم */
+  function compileTemplate(json) {
+    if (!json || !json.id || !json.html) throw new Error('ملف القالب ناقص: يحتاج id و html');
+    if (!/^[a-z0-9-]+$/i.test(json.id)) throw new Error('معرّف القالب يجب أن يكون حروفاً إنكليزية وأرقاماً و - فقط');
+    mustache(json.html, {}); // فحص الصيغة
+    return {
+      ...json,
+      types: json.types && json.types.length ? json.types : ['sales'],
+      sizes: json.sizes && json.sizes.length ? json.sizes : ['A4', 'A5'],
+      render: (ctx) => mustache(json.html, viewFor(ctx, json.minRows == null ? 10 : json.minRows)),
+    };
+  }
 
   // ---------- تخطيط الصفحات ----------
   /**
@@ -222,5 +326,5 @@
     });
   }
 
-  window.Render = { renderPages, print, totals, tafqeet, integerWords, money, fmt, esc, layoutFor };
+  window.Render = { renderPages, print, totals, tafqeet, integerWords, money, fmt, esc, layoutFor, compileTemplate, mustache };
 })();

@@ -15,17 +15,18 @@
   };
 
   // الحقول النصية البسيطة في data
-  const TEXT_FIELDS = ['customer', 'paymentMethod', 'transactionType', 'discount', 'paid', 'terms',
+  const TEXT_FIELDS = ['customer', 'customerAddress', 'customerPhone', 'paymentMethod', 'transactionType', 'discount', 'paid', 'prevBalance', 'terms',
     'amount', 'purpose', 'notes', 'amountWords', 'receiver', 'accountant'];
 
   let cur = null;        // المستند الحالي
   let templates = [];
   let dirty = false;
   let wired = false;
+  let catalog = {};
 
   function settings() { return App().settings; }
 
-  function blankItem() { return { name: '', qty: '', unit: '', price: '', notes: '' }; }
+  function blankItem() { return { name: '', qty: '', unit: '', pack: '', price: '', notes: '' }; }
 
   /** مستند جديد مع تذكّر آخر القيم المستخدمة لكل نوع (الشروط، المحاسب...) */
   function newDoc(type) {
@@ -41,7 +42,7 @@
       currency: (cur && cur.currency) || s.defaults.currency || 'IQD',
       watermark: s.defaults.watermark !== false,
       data: {
-        customer: '', paymentMethod: mem.paymentMethod || 'نقداً', transactionType: '',
+        customer: '', customerAddress: '', customerPhone: '', prevBalance: '', paymentMethod: mem.paymentMethod || 'نقداً', transactionType: '',
         items: type === 'sales' ? [blankItem(), blankItem(), blankItem()] : [],
         discount: '', paid: '', terms: mem.terms || '',
         amount: '', purpose: '', notes: '', amountWords: '',
@@ -105,14 +106,19 @@
   // ---------- جدول المواد ----------
   function renderItems() {
     const items = cur.data.items || (cur.data.items = []);
-    $('#items-editor').innerHTML = `
-      <div class="it-row it-head"><span>#</span><span>المادة</span><span>الكمية</span><span>الوحدة</span><span>السعر</span><span>ملاحظات</span><span></span></div>` +
+    const tpl = templateFor(cur);
+    const pack = !!(tpl && (tpl.itemFields || []).includes('pack'));
+    const ed = $('#items-editor');
+    ed.classList.toggle('with-pack', pack);
+    ed.innerHTML = `
+      <div class="it-row it-head"><span>#</span><span>المادة</span><span>الكمية</span><span>الوحدة</span>${pack ? '<span>التعبئة</span>' : ''}<span>السعر</span><span>ملاحظات / وصف</span><span></span></div>` +
       items.map((it, i) => `
       <div class="it-row" data-i="${i}">
         <span class="it-idx">${i + 1}</span>
-        <input data-k="name" value="${esc(it.name)}" placeholder="اسم المادة">
+        <input data-k="name" value="${esc(it.name)}" placeholder="اسم المادة" list="item-names">
         <input data-k="qty" value="${esc(it.qty)}" inputmode="decimal" dir="ltr">
         <input data-k="unit" value="${esc(it.unit)}" list="units-list">
+        ${pack ? `<input data-k="pack" value="${esc(it.pack)}" inputmode="decimal" dir="ltr">` : ''}
         <input data-k="price" value="${esc(it.price)}" inputmode="decimal" dir="ltr">
         <input data-k="notes" value="${esc(it.notes)}">
         <button type="button" class="it-del" title="حذف">✕</button>
@@ -145,6 +151,7 @@
       box.innerHTML = cur.type === 'sales'
         ? `<div><span>المجموع</span><b>${R.money(t.subtotal, cur.currency)}</b></div>
            <div><span>بعد الخصم</span><b>${R.money(t.net, cur.currency)}</b></div>
+           ${t.prevBalance ? `<div><span>مع السابق</span><b>${R.money(t.grand, cur.currency)}</b></div>` : ''}
            <div><span>الواصل</span><b class="green">${R.money(t.paid, cur.currency)}</b></div>
            <div><span>المتبقي</span><b class="${t.remaining > 0 ? 'red' : ''}">${R.money(t.remaining, cur.currency)}</b></div>`
         : `<div><span>المبلغ</span><b>${R.money(t.total, cur.currency)}</b></div>`;
@@ -173,8 +180,8 @@
     const out = JSON.parse(JSON.stringify(cur));
     const toNum = (v) => (v === '' || v == null ? '' : (isFinite(Number(String(v).replace(/,/g, ''))) ? Number(String(v).replace(/,/g, '')) : v));
     out.data.items = (out.data.items || []).filter((it) => it.name || it.qty || it.price)
-      .map((it) => ({ ...it, qty: toNum(it.qty), price: toNum(it.price) }));
-    for (const k of ['discount', 'paid', 'amount']) out.data[k] = toNum(out.data[k]);
+      .map((it) => ({ ...it, qty: toNum(it.qty), price: toNum(it.price), pack: toNum(it.pack) }));
+    for (const k of ['discount', 'paid', 'prevBalance', 'amount']) out.data[k] = toNum(out.data[k]);
     out.data.total = R.totals(out).total;
     if (cur._path) out._path = cur._path;
     const saved = await St.saveDocument(out);
@@ -207,6 +214,10 @@
       const docs = await St.listDocuments();
       const names = [...new Set(docs.map((d) => d.data && d.data.customer).filter(Boolean))];
       $('#customers-list').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
+      // قائمة المواد المستخدمة سابقاً: اختيار اسم مادة يعبّي السعر والوحدة والوصف من آخر استخدام
+      catalog = {};
+      for (const d of docs.slice().reverse()) for (const it of (d.data && d.data.items) || []) if (it.name) catalog[it.name] = it;
+      $('#item-names').innerHTML = Object.keys(catalog).map((n) => `<option value="${esc(n)}">`).join('');
     } catch (e) { /* غير مهم */ }
   }
 
@@ -218,7 +229,17 @@
     form.addEventListener('input', (e) => {
       const row = e.target.closest('.it-row');
       if (row && e.target.dataset.k) {
-        cur.data.items[Number(row.dataset.i)][e.target.dataset.k] = e.target.value;
+        const it = cur.data.items[Number(row.dataset.i)];
+        it[e.target.dataset.k] = e.target.value;
+        const known = e.target.dataset.k === 'name' && catalog[e.target.value];
+        if (known) {
+          for (const k of ['unit', 'price', 'notes', 'pack']) {
+            if (!it[k] && known[k] !== '' && known[k] != null) {
+              it[k] = known[k];
+              const el = row.querySelector(`[data-k="${k}"]`); if (el) el.value = known[k];
+            }
+          }
+        }
       } else if (e.target.id !== 'f-type') {
         readForm();
       }
@@ -228,7 +249,7 @@
       if (e.target.id === 'f-type') {
         cur = newDoc(e.target.value); dirty = false; await fillForm();
       } else if (e.target.id === 'f-template') {
-        readForm(); fillSelectors(); markDirty();
+        readForm(); fillSelectors(); renderItems(); markDirty();
       }
     });
     form.addEventListener('click', (e) => {

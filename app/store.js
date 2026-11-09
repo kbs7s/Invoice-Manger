@@ -162,7 +162,7 @@
       if (e.kind !== 'file' || !e.name.endsWith('.json')) continue;
       try {
         const t = await S.readJSON('templates/' + e.name);
-        if (t && t.id) all[t.id] = { ...t, builtin: false };
+        if (t && t.id) all[t.id] = { ...window.Render.compileTemplate(t), builtin: false, file: 'templates/' + e.name };
       } catch (err) { console.warn('قالب تالف', e.name, err); }
     }
     return Object.values(all).filter((t) => !type || (t.types || []).includes(type));
@@ -170,8 +170,12 @@
 
   async function saveTemplate(tpl) {
     if (!tpl.id) throw new Error('القالب يحتاج معرّف id');
+    if (builtinTemplates[tpl.id]) throw new Error('يوجد قالب أساسي بنفس المعرّف: ' + tpl.id);
+    window.Render.compileTemplate(tpl); // يتأكد أن القالب صالح قبل الحفظ
     await S.writeJSON('templates/' + tpl.id + '.json', tpl);
   }
+
+  async function deleteTemplate(id) { await S.remove('templates/' + id + '.json'); }
 
   // ---------- النسخ الاحتياطي ----------
   /** ملف واحد يحتوي كل شيء، للتصدير أو النقل */
@@ -194,7 +198,7 @@
     getSettings, saveSettings,
     peekNumber, takeNumber,
     docPath, saveDocument, loadDocument, deleteDocument, listDocuments,
-    registerTemplate, listTemplates, saveTemplate,
+    registerTemplate, listTemplates, saveTemplate, deleteTemplate,
     exportAll,
   };
 })();

@@ -77,6 +77,8 @@
 
             <div class="form-grid two">
               <label class="span2">السيد / الجهة<input id="f-customer" list="customers-list"></label>
+              <label data-for="sales">عنوان الزبون / التوصيل<input id="f-customerAddress"></label>
+              <label data-for="sales">هاتف الزبون<input id="f-customerPhone" dir="ltr" inputmode="tel"></label>
               <label>طريقة الدفع<input id="f-paymentMethod" list="pay-methods"></label>
               <label data-for="receipt">نوع المعاملة<input id="f-transactionType" placeholder="تسديد / دفعة مقدمة..."></label>
             </div>
@@ -89,7 +91,8 @@
               <div class="form-grid two">
                 <label>الخصم<input id="f-discount" inputmode="decimal" dir="ltr"></label>
                 <label>الواصل (فارغ = كامل المبلغ)<input id="f-paid" inputmode="decimal" dir="ltr"></label>
-                <label class="span2">شروط وملاحظات<input id="f-terms"></label>
+                <label>رصيد / طلب سابق<input id="f-prevBalance" inputmode="decimal" dir="ltr"></label>
+                <label>شروط وملاحظات<input id="f-terms"></label>
               </div>
             </div>
 
@@ -125,6 +128,7 @@
           <div class="sheet-preview" id="issue-preview"></div>
         </div>
         <datalist id="customers-list"></datalist>
+        <datalist id="item-names"></datalist>
         <datalist id="pay-methods"><option value="نقداً"><option value="آجل"><option value="صك"><option value="تحويل مصرفي"><option value="بطاقة"></datalist>
       </section>
 
@@ -152,7 +156,9 @@
       <section class="panel" data-panel="templates" hidden>
         <div class="tpl-layout">
           <div class="card tpl-side">
-            <h2>القوالب</h2>
+            <div class="row between"><h2>القوالب</h2>
+              <label class="btn small ghost file-btn">⬆ استيراد قالب<input type="file" id="tpl-import" accept=".json,application/json" hidden></label>
+            </div>
             <div id="templates-list" class="tpl-list"></div>
 
             <h2>المعاينة</h2>
@@ -232,6 +238,7 @@
   <script src="app/render.js"></script>
   <script src="app/templates/classic.js"></script>
   <script src="app/templates/modern.js"></script>
+  <script src="app/templates/sheets.js"></script>
   <script src="app/app.js"></script>
   <script src="app/issue.js"></script>
 </body>
