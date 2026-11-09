@@ -44,7 +44,8 @@
   function below1000(n) {
     const parts = [];
     const h = Math.floor(n / 100), r = n % 100;
-    if (h) parts.push(HUNDREDS[h]);
+    // "مائتا" عند الإضافة (مائتا ألف، مائتا دينار)
+    if (h) parts.push(h === 2 && !r ? 'مائتا' : HUNDREDS[h]);
     if (r) {
       if (r < 10) parts.push(ONES[r]);
       else if (r < 20) parts.push(TEENS[r - 10]);
@@ -161,6 +162,10 @@
    */
   function renderPages(doc, tpl, settings, opts = {}) {
     injectCSS(tpl);
+    // نتجاهل أسطر المواد الفارغة
+    if (doc.data && Array.isArray(doc.data.items)) {
+      doc = { ...doc, data: { ...doc.data, items: doc.data.items.filter((it) => it && (it.name || num(it.qty) || num(it.price))) } };
+    }
     const size = (tpl.sizes || []).includes(doc.size) ? doc.size : (tpl.sizes || ['A4'])[0];
     const L = layoutFor(doc.type, size);
     const company = { ...St.DEFAULT_SETTINGS.company, ...(settings.company || {}) };

@@ -57,11 +57,75 @@
     <main>
       <!-- إصدار مستند -->
       <section class="panel" data-panel="issue">
-        <div class="card">
-          <h2>إصدار مستند</h2>
-          <p class="muted">شاشة الإصدار والمعاينة والطباعة تأتي في الخطوة الثالثة من الخطة.</p>
-          <div class="next-numbers" id="next-numbers"></div>
+        <div class="issue-layout">
+          <form class="card issue-form" id="issue-form" autocomplete="off">
+            <div class="row between">
+              <h2 id="issue-title">مستند جديد</h2>
+              <button type="button" class="btn small ghost" id="btn-new">+ جديد</button>
+            </div>
+            <p class="muted" id="issue-status"></p>
+            <p class="notice" id="issue-company-notice" hidden>بيانات الجهة (الاسم والشعار والعنوان) فارغة. <a data-goto="settings">عبّئها من الإعدادات</a> حتى تظهر على المستندات.</p>
+
+            <div class="form-grid two">
+              <label>نوع المستند<select id="f-type"></select></label>
+              <label>القالب<select id="f-template"></select></label>
+              <label>المقاس<select id="f-size"></select></label>
+              <label>العملة<select id="f-currency"></select></label>
+              <label>الرقم<input id="f-number" type="number" min="1" dir="ltr"></label>
+              <label>التاريخ<input id="f-date" type="date"></label>
+            </div>
+
+            <div class="form-grid two">
+              <label class="span2">السيد / الجهة<input id="f-customer" list="customers-list"></label>
+              <label>طريقة الدفع<input id="f-paymentMethod" list="pay-methods"></label>
+              <label data-for="receipt">نوع المعاملة<input id="f-transactionType" placeholder="تسديد / دفعة مقدمة..."></label>
+            </div>
+
+            <!-- فاتورة مبيعات -->
+            <div data-for="sales">
+              <h3>المواد</h3>
+              <div class="items-editor" id="items-editor"></div>
+              <button type="button" class="btn small ghost" id="btn-add-item">+ إضافة مادة</button>
+              <div class="form-grid two">
+                <label>الخصم<input id="f-discount" inputmode="decimal" dir="ltr"></label>
+                <label>الواصل (فارغ = كامل المبلغ)<input id="f-paid" inputmode="decimal" dir="ltr"></label>
+                <label class="span2">شروط وملاحظات<input id="f-terms"></label>
+              </div>
+            </div>
+
+            <!-- وصل قبض -->
+            <div data-for="receipt">
+              <div class="form-grid two">
+                <label>المبلغ<input id="f-amount" inputmode="decimal" dir="ltr"></label>
+                <label>وذلك عن<input id="f-purpose"></label>
+                <label class="span2">الملاحظات<input id="f-notes"></label>
+              </div>
+            </div>
+
+            <div class="form-grid two">
+              <label class="span2">المبلغ كتابةً (يُكتب تلقائياً، وتقدر تعدله)
+                <div class="row nowrap"><input id="f-amountWords" class="grow"><button type="button" class="btn small ghost" id="btn-words-auto" title="رجوع للكتابة التلقائية">تلقائي</button></div>
+              </label>
+              <label>اسم المستلم<input id="f-receiver"></label>
+              <label data-for="sales">المنظم / المحاسب<input id="f-accountant"></label>
+            </div>
+
+            <div class="totals-box" id="totals-box"></div>
+
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="f-watermark"> علامة مائية</label>
+            </div>
+
+            <div class="row actions sticky-actions">
+              <button type="submit" class="btn primary">💾 حفظ</button>
+              <button type="button" class="btn primary" id="btn-save-print">حفظ وطباعة</button>
+              <button type="button" class="btn ghost" id="btn-print-only">طباعة بدون حفظ</button>
+            </div>
+          </form>
+          <div class="sheet-preview" id="issue-preview"></div>
         </div>
+        <datalist id="customers-list"></datalist>
+        <datalist id="pay-methods"><option value="نقداً"><option value="آجل"><option value="صك"><option value="تحويل مصرفي"><option value="بطاقة"></datalist>
       </section>
 
       <!-- الأرشيف -->
@@ -76,8 +140,9 @@
             </div>
           </div>
           <table class="table">
-            <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th>الملف</th></tr></thead>
+            <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th></th></tr></thead>
             <tbody id="archive-body"></tbody>
+            <tfoot id="archive-foot"></tfoot>
           </table>
           <p class="muted empty" id="archive-empty" hidden>لا توجد مستندات محفوظة بعد.</p>
         </div>
@@ -168,5 +233,6 @@
   <script src="app/templates/classic.js"></script>
   <script src="app/templates/modern.js"></script>
   <script src="app/app.js"></script>
+  <script src="app/issue.js"></script>
 </body>
 </html>

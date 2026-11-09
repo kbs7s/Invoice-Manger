@@ -80,7 +80,7 @@
 
   let currentTab = 'issue';
   const renderers = {
-    issue: renderIssue,
+    issue: () => window.Issue.render(),
     archive: renderArchive,
     templates: renderTemplates,
     settings: renderSettings,
@@ -90,17 +90,6 @@
     $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     $$('.panel').forEach((p) => (p.hidden = p.dataset.panel !== tab));
     renderers[tab]().catch((e) => toast('خطأ: ' + e.message, true));
-  }
-
-  // ----- إصدار (هيكل مؤقت) -----
-  async function renderIssue() {
-    const box = $('#next-numbers');
-    box.innerHTML = '';
-    for (const [type, info] of Object.entries(St.DOC_TYPES)) {
-      const n = await St.peekNumber(type);
-      box.insertAdjacentHTML('beforeend',
-        `<div class="stat"><span>الرقم التالي — ${esc(info.label)}</span><b>${esc(formatNumber(type, n, settings))}</b></div>`);
-    }
   }
 
   // ----- الأرشيف -----
@@ -119,15 +108,47 @@
       return hay.includes(q);
     });
     $('#archive-body').innerHTML = rows.map((d) => `
-      <tr>
+      <tr data-path="${esc(d._path)}">
         <td dir="ltr">${esc(formatNumber(d.type, d.number, settings))}</td>
         <td>${esc((St.DOC_TYPES[d.type] || {}).label || d.type)}</td>
         <td>${esc(d.date)}</td>
         <td>${esc(d.data && d.data.customer)}</td>
-        <td>${esc(formatMoney(d.data && d.data.total, d.currency))}</td>
-        <td class="path">${esc(d._path)}</td>
+        <td dir="ltr" class="money">${esc(formatMoney(d.data && d.data.total, d.currency))}</td>
+        <td class="acts">
+          <button class="btn small ghost" data-act="open">فتح</button>
+          <button class="btn small ghost" data-act="print">طباعة</button>
+          <button class="btn small ghost" data-act="copy">تكرار</button>
+          <button class="btn small ghost danger" data-act="delete">حذف</button>
+        </td>
       </tr>`).join('');
+    // مجموع المبالغ المعروضة لكل عملة ونوع
+    const sums = {};
+    for (const d of rows) {
+      const k = d.type + '|' + (d.currency || 'IQD');
+      sums[k] = (sums[k] || 0) + Number((d.data && d.data.total) || 0);
+    }
+    $('#archive-foot').innerHTML = rows.length ? `<tr><td colspan="6" class="muted">${rows.length} مستند — ` +
+      Object.entries(sums).map(([k, v]) => { const [t, c] = k.split('|'); return `${esc(St.DOC_TYPES[t].label)}: <b dir="ltr">${esc(formatMoney(v, c))}</b>`; }).join(' · ') +
+      '</td></tr>' : '';
     $('#archive-empty').hidden = rows.length > 0;
+  }
+
+  async function archiveAction(act, path) {
+    const doc = archiveDocs.find((d) => d._path === path);
+    if (!doc) return;
+    if (act === 'open' || act === 'copy') {
+      if (await window.Issue.open(doc, act === 'copy')) switchTab('issue');
+    } else if (act === 'print') {
+      const tpls = await St.listTemplates(doc.type);
+      const tpl = tpls.find((t) => t.id === doc.templateId) || tpls[0];
+      Render.print(Render.renderPages(doc, tpl, settings, { watermark: doc.watermark }));
+    } else if (act === 'delete') {
+      const label = formatNumber(doc.type, doc.number, settings);
+      if (!confirm(`حذف المستند ${label} نهائياً من المجلد؟`)) return;
+      await St.deleteDocument(path);
+      toast('تم حذف ' + label);
+      renderArchive(true);
+    }
   }
 
   // ----- القوالب والمعاينة -----
@@ -294,6 +315,10 @@
   $('#tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab); });
   $('#archive-type').addEventListener('change', () => renderArchive(true));
   $('#archive-search').addEventListener('input', () => renderArchive(false));
+  $('#archive-body').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (b) archiveAction(b.dataset.act, b.closest('tr').dataset.path).catch((err) => toast(err.message, true));
+  });
   $('#btn-archive-refresh').addEventListener('click', () => renderArchive(true));
   $('#templates-list').addEventListener('click', (e) => {
     const b = e.target.closest('.tpl');
@@ -318,7 +343,11 @@
   $('#btn-export').addEventListener('click', () => downloadBackup().catch((e) => toast(e.message, true)));
 
   // للاختبار: تشغيل البرنامج على مجلد جاهز
-  window.App = { openApp, toast, formatNumber, formatMoney, switchTab, pv };
+  window.App = {
+    openApp, toast, formatNumber, formatMoney, switchTab, pv,
+    get settings() { return settings; },
+    set settings(v) { settings = v; },
+  };
 
   boot().catch((e) => showGate('none', e.message));
 })();
