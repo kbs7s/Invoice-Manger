@@ -104,7 +104,7 @@
   function salesBody(ctx) {
     const { h, data, blank, currency } = ctx;
     const sym = h.esc((window.Store.CURRENCIES[currency] || {}).symbol || '');
-    const minRows = 8;
+    const minRows = blank ? 8 : 0; // أسطر فارغة للنموذج اليدوي فقط
     const items = blank ? [] : (data.items || []);
     let rows = items.map((it, i) => `
       <tr>

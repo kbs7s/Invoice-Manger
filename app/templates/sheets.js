@@ -50,7 +50,7 @@
   function renderBanner(ctx) {
     const { h, company, data } = ctx;
     const its = items(ctx);
-    const minRows = 24;
+    const minRows = ctx.blank ? 24 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it) => `
       <tr><td>${h.esc(it.name)}</td><td>${h.esc(it.notes)}</td><td>${h.esc(it.qty)}</td>
       <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td></tr>`).join('');
@@ -140,7 +140,7 @@
   function renderBilingual(ctx) {
     const { h, company, data } = ctx;
     const its = items(ctx);
-    const minRows = 26;
+    const minRows = ctx.blank ? 26 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it) => `
       <tr><td class="name">${h.esc(it.name)}</td><td>${h.esc(it.notes)}</td><td>${h.esc(it.qty)}</td>
       <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td></tr>`).join('');
@@ -219,7 +219,7 @@
   function renderBoxed(ctx) {
     const { h, company, data } = ctx;
     const its = items(ctx);
-    const minRows = 14;
+    const minRows = ctx.blank ? 14 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it, i) => `
       <tr><td>${i + 1}</td><td class="name">${h.esc(it.name)}</td><td class="num">${h.esc(it.qty)}</td><td class="num">${h.esc(it.pack)}</td>
       <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td><td>${h.esc(it.notes)}</td></tr>`).join('');

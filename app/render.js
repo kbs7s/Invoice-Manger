@@ -197,7 +197,7 @@
       price: fmt(it.price, currency), total: fmt(num(it.qty) * num(it.price), currency),
     }));
     const emptyRows = [];
-    for (let k = items.length; k < (minRows || 0); k++) emptyRows.push({ i: k + 1 });
+    if (blank) for (let k = items.length; k < (minRows || 0); k++) emptyRows.push({ i: k + 1 }); // للنموذج اليدوي فقط
     const v = (x) => (blank ? '' : x);
     return {
       company: ctx.company, title: ctx.title, number: ctx.number, copyLabel: ctx.copyLabel,

@@ -22,7 +22,7 @@
 القيم المتاحة: `company.name`, `company.subtitle`, `company.address`, `company.phone`, `company.email`, `logo`, `watermark`,
 `title`, `number`, `copyLabel`, `date`, `customer`, `customerAddress`, `customerPhone`, `paymentMethod`, `transactionType`,
 `purpose`, `notes`, `terms`, `receiver`, `accountant`, `symbol`,
-`items` (لكل مادة: `i`, `name`, `notes`, `unit`, `qty`, `pack`, `price`, `total`), `emptyRows` (لكل سطر: `i`), `itemCount`,
+`items` (لكل مادة: `i`, `name`, `notes`, `unit`, `qty`, `pack`, `price`, `total`), `emptyRows` (لكل سطر: `i`، في النموذج الفارغ فقط), `itemCount`,
 `subtotal`, `discount`, `net`, `prevBalance`, `hasPrev`, `grand`, `paid`, `remaining`, `amount`, `words`, `isSales`, `isReceipt`, `blank`.
 
 مثال كامل: [simple-example.json](simple-example.json)
