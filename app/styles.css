@@ -1,0 +1,91 @@
+/* خطوط النظام فقط، حتى يعمل البرنامج بدون إنترنت */
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary: #0f766e;
+  --primary-dark: #115e59;
+  --danger: #b91c1c;
+  --radius: 10px;
+  font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  color: var(--text);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); font-size: 15px; }
+[hidden] { display: none !important; }
+code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; direction: ltr; display: inline-block; }
+
+/* أزرار */
+.btn { border: 1px solid transparent; border-radius: 8px; padding: 8px 16px; cursor: pointer; font: inherit; background: #e2e8f0; color: var(--text); }
+.btn:hover { filter: brightness(0.96); }
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.primary:hover { background: var(--primary-dark); }
+.btn.ghost { background: transparent; border-color: var(--border); }
+.btn.link { background: none; color: var(--primary); text-decoration: underline; }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.big { padding: 12px 28px; font-size: 17px; }
+
+/* شاشة البداية */
+.gate { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.gate-card { background: var(--surface); border-radius: 16px; padding: 40px; max-width: 520px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(15,23,42,.08); }
+.gate-card h1 { margin: 8px 0 20px; font-size: 24px; }
+.gate-logo { font-size: 48px; }
+.gate-card .btn.big { margin-top: 12px; }
+.gate-card .btn.link { display: block; margin: 12px auto 0; }
+.muted { color: var(--muted); font-size: 14px; }
+.warn { color: #b45309; font-weight: 600; }
+.error { color: var(--danger); }
+
+/* الهيكل */
+.topbar { display: flex; align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 20px; height: 56px; position: sticky; top: 0; z-index: 5; }
+.brand { font-weight: 700; font-size: 17px; white-space: nowrap; }
+.tabs { display: flex; gap: 4px; flex: 1; overflow-x: auto; }
+.tabs button { border: 0; background: none; font: inherit; padding: 16px 14px; cursor: pointer; color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; }
+.tabs button.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.folder { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; white-space: nowrap; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+.card h2 { margin: 0 0 8px; font-size: 18px; }
+.card h2:not(:first-child) { margin-top: 28px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.actions { margin-top: 24px; }
+
+/* النماذج */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px 18px; margin-top: 12px; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); }
+input, select { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); }
+input:focus, select:focus { outline: 2px solid #99f6e4; border-color: var(--primary); }
+.logo-field { display: flex; align-items: center; gap: 8px; }
+.logo-field img { width: 44px; height: 44px; object-fit: contain; border: 1px dashed var(--border); border-radius: 8px; }
+.logo-field img:not([src]), .logo-field img[src=""] { visibility: hidden; }
+.logo-field input[type=file] { flex: 1; min-width: 0; padding: 5px; }
+
+/* الجداول */
+.table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.table th, .table td { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.table th { color: var(--muted); font-weight: 600; }
+.table td.path { direction: ltr; text-align: left; color: var(--muted); font-size: 12px; }
+.empty { text-align: center; padding: 24px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 12px; }
+.tpl { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.tpl b { display: block; margin-bottom: 4px; }
+.badge { display: inline-block; font-size: 12px; background: #ccfbf1; color: var(--primary-dark); padding: 1px 8px; border-radius: 99px; margin-inline-end: 4px; }
+
+.next-numbers { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.next-numbers .stat { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 18px; }
+.next-numbers .stat span { display: block; color: var(--muted); font-size: 13px; }
+.next-numbers .stat b { font-size: 20px; direction: ltr; display: inline-block; }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 20px; border-radius: 8px; z-index: 20; }
+.toast.error { background: var(--danger); }
+
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; height: auto; gap: 8px; padding: 8px 16px; }
+  .tabs { order: 3; width: 100%; }
+  .tabs button { padding: 10px; }
+}

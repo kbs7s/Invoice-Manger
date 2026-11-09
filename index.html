@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مدير الفواتير والوصولات</title>
+  <link rel="stylesheet" href="app/styles.css">
+</head>
+<body>
+
+  <!-- شاشة اختيار مجلد العمل -->
+  <section id="gate" class="gate" hidden>
+    <div class="gate-card">
+      <div class="gate-logo">🧾</div>
+      <h1>مدير الفواتير والوصولات</h1>
+
+      <div id="gate-unsupported" hidden>
+        <p class="warn">هذا المتصفح لا يدعم الحفظ داخل مجلد على الجهاز.</p>
+        <p>افتح البرنامج باستخدام <b>Google Chrome</b> أو <b>Microsoft Edge</b>.</p>
+      </div>
+
+      <div id="gate-new" hidden>
+        <p>اختر مجلداً على جهازك ليحفظ فيه البرنامج القوالب والفواتير والإعدادات.</p>
+        <p class="muted">يُفضّل مجلد فارغ جديد، مثلاً: <code>Documents/الفواتير</code>. يمكنك نقله لاحقاً إلى جهاز آخر وسيكمل العمل من نفس الأرقام.</p>
+        <button class="btn primary big" id="btn-pick">📁 اختيار مجلد العمل</button>
+      </div>
+
+      <div id="gate-resume" hidden>
+        <p>آخر مجلد استخدمته: <b id="gate-folder"></b></p>
+        <p class="muted">المتصفح يطلب تأكيد السماح بالوصول للمجلد في كل مرة تفتح البرنامج.</p>
+        <button class="btn primary big" id="btn-resume">متابعة العمل</button>
+        <button class="btn link" id="btn-pick-other">اختيار مجلد آخر</button>
+      </div>
+
+      <p id="gate-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- البرنامج -->
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <div class="brand">🧾 مدير الفواتير</div>
+      <nav class="tabs" id="tabs">
+        <button data-tab="issue" class="active">إصدار مستند</button>
+        <button data-tab="archive">الأرشيف</button>
+        <button data-tab="templates">القوالب</button>
+        <button data-tab="settings">الإعدادات</button>
+      </nav>
+      <div class="folder" title="مجلد العمل">
+        📁 <span id="folder-name"></span>
+        <button class="btn small ghost" id="btn-change-folder">تغيير</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- إصدار مستند -->
+      <section class="panel" data-panel="issue">
+        <div class="card">
+          <h2>إصدار مستند</h2>
+          <p class="muted">شاشة الإصدار والمعاينة والطباعة تأتي في الخطوة الثالثة من الخطة.</p>
+          <div class="next-numbers" id="next-numbers"></div>
+        </div>
+      </section>
+
+      <!-- الأرشيف -->
+      <section class="panel" data-panel="archive" hidden>
+        <div class="card">
+          <div class="row between">
+            <h2>الأرشيف</h2>
+            <div class="row">
+              <select id="archive-type"></select>
+              <input id="archive-search" type="search" placeholder="بحث بالاسم أو الرقم...">
+              <button class="btn ghost" id="btn-archive-refresh">تحديث</button>
+            </div>
+          </div>
+          <table class="table">
+            <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th>الملف</th></tr></thead>
+            <tbody id="archive-body"></tbody>
+          </table>
+          <p class="muted empty" id="archive-empty" hidden>لا توجد مستندات محفوظة بعد.</p>
+        </div>
+      </section>
+
+      <!-- القوالب -->
+      <section class="panel" data-panel="templates" hidden>
+        <div class="card">
+          <h2>القوالب</h2>
+          <div id="templates-list" class="grid"></div>
+          <p class="muted empty" id="templates-empty" hidden>القوالب المحوّلة من تصاميمك تُضاف في الخطوة الثانية.</p>
+        </div>
+      </section>
+
+      <!-- الإعدادات -->
+      <section class="panel" data-panel="settings" hidden>
+        <form class="card" id="settings-form">
+          <h2>بيانات الجهة</h2>
+          <p class="muted">تظهر في رأس كل فاتورة ووصل.</p>
+          <div class="form-grid">
+            <label>الاسم<input name="company.name"></label>
+            <label>وصف مختصر<input name="company.subtitle" placeholder="مثلاً: تجارة وتجهيز المواد"></label>
+            <label>العنوان<input name="company.address"></label>
+            <label>الهاتف<input name="company.phone" dir="ltr"></label>
+            <label>البريد الإلكتروني<input name="company.email" dir="ltr"></label>
+            <label>الشعار
+              <div class="logo-field">
+                <img id="logo-preview" alt="">
+                <input type="file" id="logo-input" accept="image/*">
+                <button type="button" class="btn small ghost" id="btn-logo-clear">إزالة</button>
+              </div>
+            </label>
+          </div>
+
+          <h2>الافتراضيات</h2>
+          <div class="form-grid">
+            <label>العملة<select name="defaults.currency" id="sel-currency"></select></label>
+            <label>مقاس الورق<select name="defaults.size" id="sel-size"></select></label>
+          </div>
+
+          <h2>بادئة الترقيم</h2>
+          <div class="form-grid" id="prefix-fields"></div>
+
+          <div class="row actions">
+            <button class="btn primary" type="submit">حفظ الإعدادات</button>
+            <button class="btn ghost" type="button" id="btn-export">تنزيل نسخة احتياطية</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app/storage.js"></script>
+  <script src="app/store.js"></script>
+  <script src="app/app.js"></script>
+</body>
+</html>
