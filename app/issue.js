@@ -312,5 +312,15 @@
     return true;
   }
 
-  window.Issue = { render, open, get current() { return cur; } };
+  /** يبدأ مستنداً جديداً من نوع معيّن، مع بيانات جاهزة اختيارية (مثل اسم الزبون) */
+  async function startNew(type, prefill, currency) {
+    if (dirty && !confirm('فيه تغييرات غير محفوظة بالمستند الحالي. تكمل؟')) return false;
+    cur = newDoc(type);
+    if (currency) cur.currency = currency;
+    Object.assign(cur.data, prefill || {});
+    dirty = false;
+    return true;
+  }
+
+  window.Issue = { render, open, startNew, get current() { return cur; } };
 })();

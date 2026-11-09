@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>مدير الفواتير والوصولات</title>
+  <script>try { var t = localStorage.getItem('im-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
   <link rel="stylesheet" href="app/fonts/fonts.css">
   <link rel="stylesheet" href="app/styles.css">
   <link rel="stylesheet" href="app/sheet.css">
@@ -41,22 +42,94 @@
   <!-- البرنامج -->
   <div id="app" class="app" hidden>
     <header class="topbar">
-      <div class="brand">🧾 مدير الفواتير</div>
+      <div class="brand"><div class="brand-icon">🧾</div><div><b>مدير الفواتير</b><small>الفواتير ووصولات القبض</small></div></div>
       <nav class="tabs" id="tabs">
-        <button data-tab="issue" class="active">إصدار مستند</button>
-        <button data-tab="archive">الأرشيف</button>
-        <button data-tab="templates">القوالب</button>
-        <button data-tab="settings">الإعدادات</button>
+        <button data-tab="dashboard" class="active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>لوحة التحكم</button>
+        <button data-tab="issue"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>إصدار مستند</button>
+        <button data-tab="archive"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>الأرشيف</button>
+        <button data-tab="customers"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>العملاء</button>
+        <button data-tab="templates"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>القوالب</button>
+        <button data-tab="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>الإعدادات</button>
       </nav>
-      <div class="folder" title="مجلد العمل">
-        📁 <span id="folder-name"></span>
-        <button class="btn small ghost" id="btn-change-folder">تغيير</button>
+      <div class="top-actions">
+        <div class="folder" title="مجلد العمل: كل المستندات تُحفظ فيه كملفات">
+          <span class="dot"></span><span id="folder-name"></span>
+          <button class="btn small ghost" id="btn-change-folder">تغيير</button>
+        </div>
+        <button class="btn icon ghost" id="btn-theme" title="الوضع الليلي / النهاري"><span id="theme-icon">🌙</span></button>
+        <button class="btn primary small" id="btn-top-new">+ مستند جديد</button>
       </div>
     </header>
 
     <main>
+      <!-- لوحة التحكم -->
+      <section class="panel" data-panel="dashboard">
+        <div class="hero">
+          <div>
+            <h2 id="dash-hello">أهلاً بك 👋</h2>
+            <p id="dash-sub">نظرة سريعة على المبيعات والتحصيل والديون.</p>
+          </div>
+          <div class="row">
+            <button class="btn primary" data-new="sales">📄 فاتورة مبيعات جديدة</button>
+            <button class="btn" data-new="receipt">💵 وصل قبض جديد</button>
+          </div>
+        </div>
+        <div class="row between" style="margin-bottom:12px">
+          <b>الفترة</b>
+          <select id="dash-period">
+            <option value="month">هذا الشهر</option>
+            <option value="year">هذه السنة</option>
+            <option value="all">كل الفترات</option>
+          </select>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-ico blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div><div><span>إجمالي المبيعات</span><b id="kpi-sales">0</b><small id="kpi-sales-n"></small></div></div>
+          <div class="stat"><div class="stat-ico green"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></div><div><span>المقبوض (واصل + وصولات)</span><b id="kpi-paid">0</b><small id="kpi-paid-n"></small></div></div>
+          <div class="stat"><div class="stat-ico amber"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><span>المتبقي على الزبائن</span><b id="kpi-rem">0</b><small id="kpi-rem-n"></small></div></div>
+          <div class="stat"><div class="stat-ico violet"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8M16 17H8M16 13h-2"/></svg></div><div><span>عدد المستندات</span><b id="kpi-docs">0</b><small id="kpi-docs-n"></small></div></div>
+        </div>
+        <div class="dash-grid">
+          <div class="card">
+            <div class="card-head">
+              <div><h2>آخر المستندات</h2><p class="muted">آخر ما صدر من فواتير ووصولات</p></div>
+              <button class="btn small ghost" data-goto="archive">كل الأرشيف ←</button>
+            </div>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th></th></tr></thead>
+                <tbody id="dash-recent"></tbody>
+              </table>
+            </div>
+            <p class="muted empty" id="dash-empty" hidden>لا توجد مستندات بعد. ابدأ بإصدار أول فاتورة.</p>
+          </div>
+          <div>
+            <div class="card">
+              <div class="progress">
+                <div class="progress-head"><span>نسبة التحصيل</span><span id="kpi-pct" dir="ltr">0%</span></div>
+                <div class="progress-bar"><div id="kpi-bar" style="width:0%"></div></div>
+                <p class="muted" style="margin:8px 0 0;font-size:12px">المقبوض من إجمالي المطلوب على فواتير الفترة</p>
+              </div>
+            </div>
+            <div class="card">
+              <h2 style="font-size:16px">أكثر الزبائن ديناً</h2>
+              <ul class="top-list" id="dash-debtors"></ul>
+              <p class="muted" id="dash-debtors-empty" hidden>لا توجد ديون. 👌</p>
+            </div>
+            <div class="card">
+              <h2 style="font-size:16px">اختصارات</h2>
+              <div class="quick">
+                <button data-goto="customers"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><div><b>العملاء</b><span>الحسابات والديون</span></div></button>
+                <button data-goto="templates"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg><div><b>القوالب</b><span>التصميم والألوان</span></div></button>
+                <button id="dash-backup"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg><div><b>نسخة احتياطية</b><span>تنزيل ملف واحد</span></div></button>
+                <button data-goto="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><div><b>بيانات الجهة</b><span>الاسم والشعار</span></div></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- إصدار مستند -->
-      <section class="panel" data-panel="issue">
+      <section class="panel" data-panel="issue" hidden>
         <div class="issue-layout">
           <form class="card issue-form" id="issue-form" autocomplete="off">
             <div class="row between">
@@ -135,20 +208,48 @@
       <!-- الأرشيف -->
       <section class="panel" data-panel="archive" hidden>
         <div class="card">
-          <div class="row between">
-            <h2>الأرشيف</h2>
+          <div class="card-head">
+            <div><h2>الأرشيف</h2><p class="muted">كل المستندات المحفوظة في مجلد العمل</p></div>
             <div class="row">
+              <label class="search"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="archive-search" type="search" placeholder="بحث بالاسم أو الرقم أو التاريخ..."></label>
               <select id="archive-type"></select>
-              <input id="archive-search" type="search" placeholder="بحث بالاسم أو الرقم...">
+              <select id="archive-status">
+                <option value="">كل الحالات</option>
+                <option value="paid">مدفوعة</option>
+                <option value="partial">دفعة جزئية</option>
+                <option value="due">آجل</option>
+              </select>
               <button class="btn ghost" id="btn-archive-refresh">تحديث</button>
             </div>
           </div>
+          <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th></th></tr></thead>
+            <thead><tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th></th></tr></thead>
             <tbody id="archive-body"></tbody>
             <tfoot id="archive-foot"></tfoot>
           </table>
+          </div>
           <p class="muted empty" id="archive-empty" hidden>لا توجد مستندات محفوظة بعد.</p>
+        </div>
+      </section>
+
+      <!-- العملاء -->
+      <section class="panel" data-panel="customers" hidden>
+        <div class="card">
+          <div class="card-head">
+            <div><h2>العملاء</h2><p class="muted">تُجمع تلقائياً من المستندات المحفوظة: المشتريات، المقبوض، والمتبقي على كل زبون.</p></div>
+            <div class="row">
+              <label class="search"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="cust-search" type="search" placeholder="بحث باسم العميل أو الهاتف..."></label>
+              <select id="cust-sort">
+                <option value="remaining">الأكثر ديناً</option>
+                <option value="total">الأكثر شراءً</option>
+                <option value="recent">آخر تعامل</option>
+                <option value="name">الاسم</option>
+              </select>
+            </div>
+          </div>
+          <div class="customers" id="customers-grid"></div>
+          <p class="muted empty" id="customers-empty" hidden>لا يوجد عملاء بعد. يظهر العميل هنا بعد حفظ أول مستند باسمه.</p>
         </div>
       </section>
 
@@ -192,7 +293,7 @@
 
       <!-- الإعدادات -->
       <section class="panel" data-panel="settings" hidden>
-        <form class="card" id="settings-form">
+        <form class="card" id="settings-form" style="max-width:1100px;margin-inline:auto">
           <h2>بيانات الجهة</h2>
           <p class="muted">تظهر في رأس كل فاتورة ووصل.</p>
           <div class="form-grid">

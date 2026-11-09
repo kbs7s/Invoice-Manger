@@ -78,10 +78,12 @@
     switchTab(currentTab);
   }
 
-  let currentTab = 'issue';
+  let currentTab = 'dashboard';
   const renderers = {
+    dashboard: renderDashboard,
     issue: () => window.Issue.render(),
     archive: renderArchive,
+    customers: renderCustomers,
     templates: renderTemplates,
     settings: renderSettings,
   };
@@ -90,6 +92,161 @@
     $$('#tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     $$('.panel').forEach((p) => (p.hidden = p.dataset.panel !== tab));
     renderers[tab]().catch((e) => toast('خطأ: ' + e.message, true));
+  }
+
+  // ----- الحالة المالية -----
+  /** الحالة المالية للمستند: للفاتورة المتبقي = الصافي − الواصل (بدون الرصيد السابق حتى لا يُحسب مرتين) */
+  function money(d) {
+    const t = Render.totals(d);
+    if (d.type === 'receipt') return { total: t.total, paid: t.total, due: 0, status: 'receipt' };
+    const due = Math.max(0, t.net - t.paid);
+    return { total: t.net, paid: Math.min(t.paid, t.net), due, status: due <= 0.0001 ? 'paid' : (t.paid > 0 ? 'partial' : 'due') };
+  }
+  const STATUS = {
+    paid: '<span class="badge success">مدفوعة</span>',
+    partial: '<span class="badge warning">دفعة جزئية</span>',
+    due: '<span class="badge danger">آجل</span>',
+    receipt: '<span class="badge primary">مقبوض</span>',
+  };
+  const typeBadge = (t) => `<span class="badge ${t === 'sales' ? '' : 'primary'}">${esc((St.DOC_TYPES[t] || {}).label || t)}</span>`;
+  /** يجمع مبالغ بعملات مختلفة: { IQD: 1000, USD: 5 } */
+  function addTo(map, cur, v) { cur = cur || 'IQD'; map[cur] = (map[cur] || 0) + v; }
+  function sumText(map, main) {
+    const keys = Object.keys(map).filter((k) => Math.abs(map[k]) > 0.0001);
+    if (!keys.length) return { main: formatMoney(0, main), rest: '' };
+    const first = keys.includes(main) ? main : keys[0];
+    return { main: formatMoney(map[first], first), rest: keys.filter((k) => k !== first).map((k) => '+ ' + formatMoney(map[k], k)).join('  ') };
+  }
+
+  function docRow(d, actions) {
+    const m = money(d);
+    return `
+      <tr data-path="${esc(d._path)}">
+        <td class="num strong">${esc(formatNumber(d.type, d.number, settings))}</td>
+        <td>${typeBadge(d.type)}</td>
+        <td class="num">${esc(d.date)}</td>
+        <td class="strong">${esc(d.data && d.data.customer)}</td>
+        <td class="money">${esc(formatMoney(m.total, d.currency))}${m.due > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:500">متبقي ${esc(formatMoney(m.due, d.currency))}</div>` : ''}</td>
+        <td>${STATUS[m.status]}</td>
+        <td class="acts">${actions}</td>
+      </tr>`;
+  }
+
+  // ----- لوحة التحكم -----
+  let dashDocs = [];
+  function inPeriod(d, period) {
+    if (period === 'all') return true;
+    const now = new Date();
+    const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    return period === 'year' ? String(d.date || '').startsWith(String(now.getFullYear())) : String(d.date || '').startsWith(ym);
+  }
+  async function renderDashboard() {
+    dashDocs = await St.listDocuments();
+    const period = $('#dash-period').value;
+    const main = settings.defaults.currency || 'IQD';
+    const docs = dashDocs.filter((d) => inPeriod(d, period));
+    const sales = {}, paid = {}, due = {};
+    let nSales = 0, nRec = 0;
+    for (const d of docs) {
+      const m = money(d);
+      if (d.type === 'sales') { nSales++; addTo(sales, d.currency, m.total); }
+      else nRec++;
+      addTo(paid, d.currency, m.paid);
+    }
+    const S1 = sumText(sales, main), S2 = sumText(paid, main);
+    $('#kpi-sales').textContent = S1.main; $('#kpi-sales-n').textContent = S1.rest || `${nSales} فاتورة`;
+    $('#kpi-paid').textContent = S2.main; $('#kpi-paid-n').textContent = S2.rest || `${nRec} وصل قبض`;
+    $('#kpi-docs').textContent = docs.length;
+    $('#kpi-docs-n').textContent = `من أصل ${dashDocs.length} بالأرشيف`;
+
+    // الديون تراكمية (كل الفترات) لأنها ما زالت مستحقة
+    const custs = customerBalances(dashDocs);
+    const debtors = custs.filter((c) => c.balance > 0.0001);
+    for (const c of debtors) addTo(due, c.currency, c.balance);
+    const S3 = sumText(due, main);
+    $('#kpi-rem').textContent = S3.main; $('#kpi-rem-n').textContent = S3.rest || `على ${debtors.length} زبون (حتى اليوم)`;
+
+    const salesMain = sales[main] || 0, paidMain = paid[main] || 0;
+    const pct = salesMain > 0 ? Math.min(100, Math.round((paidMain / salesMain) * 100)) : (docs.length ? 100 : 0);
+    $('#kpi-pct').textContent = pct + '%';
+    $('#kpi-bar').style.width = pct + '%';
+
+    const company = (settings.company && settings.company.name) || '';
+    $('#dash-hello').textContent = company ? `أهلاً، ${company} 👋` : 'أهلاً بك 👋';
+    $('#dash-sub').textContent = dashDocs.length
+      ? `آخر مستند صدر بتاريخ ${dashDocs[0].date}. الأرقام التالية حسب الفترة المختارة.`
+      : 'ابدأ بإصدار أول فاتورة أو وصل، وستظهر هنا الإحصائيات.';
+
+    const recent = dashDocs.slice(0, 7);
+    $('#dash-recent').innerHTML = recent.map((d) => docRow(d,
+      '<button class="btn small ghost" data-act="open" title="فتح للتعديل">✏️</button><button class="btn small ghost" data-act="print" title="طباعة">🖨️</button>')).join('');
+    $('#dash-empty').hidden = recent.length > 0;
+
+    const top = debtors.sort((a, b) => b.balance - a.balance).slice(0, 5);
+    $('#dash-debtors').innerHTML = top.map((c) => `<li><span>${esc(c.name)}</span><b>${esc(formatMoney(c.balance, c.currency))}</b></li>`).join('');
+    $('#dash-debtors-empty').hidden = top.length > 0;
+  }
+
+  // ----- العملاء -----
+  /** حساب كل زبون: المشتريات − الواصل بالفواتير − وصولات القبض = المتبقي عليه */
+  function customerBalances(docs) {
+    const map = new Map();
+    for (const d of docs.slice().reverse()) { // من الأقدم للأحدث حتى تبقى آخر بيانات اتصال
+      const name = ((d.data && d.data.customer) || '').trim();
+      if (!name) continue;
+      const key = name + '|' + (d.currency || 'IQD');
+      let c = map.get(key);
+      if (!c) { c = { name, currency: d.currency || 'IQD', phone: '', address: '', count: 0, total: 0, paid: 0, balance: 0, last: '' }; map.set(key, c); }
+      const m = money(d);
+      c.count++;
+      if (d.type === 'sales') c.total += m.total;
+      c.paid += m.paid;
+      c.balance = c.total - c.paid;
+      if (d.data.customerPhone) c.phone = d.data.customerPhone;
+      if (d.data.customerAddress) c.address = d.data.customerAddress;
+      if ((d.date || '') > c.last) c.last = d.date || '';
+    }
+    return Array.from(map.values());
+  }
+
+  let custList = [];
+  async function renderCustomers(reload = true) {
+    if (reload) custList = customerBalances(await St.listDocuments());
+    const q = $('#cust-search').value.trim().toLowerCase();
+    const sort = $('#cust-sort').value;
+    const rows = custList.filter((c) => !q || (c.name + ' ' + c.phone).toLowerCase().includes(q));
+    rows.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ar')
+      : sort === 'recent' ? b.last.localeCompare(a.last)
+      : sort === 'total' ? b.total - a.total : b.balance - a.balance);
+    $('#customers-grid').innerHTML = rows.map((c, i) => {
+      const st = c.balance > 0.0001 ? '<span class="badge danger">عليه مبلغ</span>' : (c.balance < -0.0001 ? '<span class="badge primary">له رصيد</span>' : '<span class="badge success">حساب خالص</span>');
+      return `
+      <div class="customer" data-i="${custList.indexOf(c)}">
+        <div class="customer-head"><h3>${esc(c.name)}</h3>${st}</div>
+        <div class="customer-info">
+          ${c.phone ? `<span>📞 <span dir="ltr">${esc(c.phone)}</span></span>` : ''}
+          ${c.address ? `<span>📍 ${esc(c.address)}</span>` : ''}
+          <span>📑 ${c.count} مستند · آخر تعامل ${esc(c.last)}</span>
+        </div>
+        <div class="customer-money">
+          <div><span>المشتريات</span><b>${esc(formatMoney(c.total, c.currency))}</b></div>
+          <div><span>المقبوض</span><b>${esc(formatMoney(c.paid, c.currency))}</b></div>
+          <div><span>${c.balance < 0 ? 'رصيد له' : 'المتبقي'}</span><b class="${c.balance > 0.0001 ? 'red' : 'green'}">${esc(formatMoney(Math.abs(c.balance), c.currency))}</b></div>
+        </div>
+        <div class="row">
+          <button class="btn small" data-cust="sales">+ فاتورة</button>
+          <button class="btn small" data-cust="receipt">+ وصل قبض</button>
+          <button class="btn small ghost" data-cust="history">المستندات</button>
+        </div>
+      </div>`;
+    }).join('');
+    $('#customers-empty').hidden = rows.length > 0;
+  }
+
+  async function newFor(type, c) {
+    const prefill = c ? { customer: c.name, customerPhone: c.phone, customerAddress: c.address } : null;
+    if (type === 'receipt' && c && c.balance > 0) prefill.amount = String(Math.round(c.balance * 100) / 100);
+    if (await window.Issue.startNew(type, prefill, c && c.currency)) switchTab('issue');
   }
 
   // ----- الأرشيف -----
@@ -102,39 +259,32 @@
     }
     if (reload) archiveDocs = await St.listDocuments(sel.value || undefined);
     const q = $('#archive-search').value.trim().toLowerCase();
+    const status = $('#archive-status').value;
     const rows = archiveDocs.filter((d) => {
+      if (status && money(d).status !== status) return false;
       if (!q) return true;
-      const hay = [formatNumber(d.type, d.number, settings), d.data && d.data.customer, d.date].join(' ').toLowerCase();
+      const hay = [formatNumber(d.type, d.number, settings), d.number, d.data && d.data.customer, d.data && d.data.customerPhone, d.date].join(' ').toLowerCase();
       return hay.includes(q);
     });
-    $('#archive-body').innerHTML = rows.map((d) => `
-      <tr data-path="${esc(d._path)}">
-        <td dir="ltr">${esc(formatNumber(d.type, d.number, settings))}</td>
-        <td>${esc((St.DOC_TYPES[d.type] || {}).label || d.type)}</td>
-        <td>${esc(d.date)}</td>
-        <td>${esc(d.data && d.data.customer)}</td>
-        <td dir="ltr" class="money">${esc(formatMoney(d.data && d.data.total, d.currency))}</td>
-        <td class="acts">
+    $('#archive-body').innerHTML = rows.map((d) => docRow(d, `
           <button class="btn small ghost" data-act="open">فتح</button>
           <button class="btn small ghost" data-act="print">طباعة</button>
           <button class="btn small ghost" data-act="copy">تكرار</button>
-          <button class="btn small ghost danger" data-act="delete">حذف</button>
-        </td>
-      </tr>`).join('');
+          <button class="btn small ghost danger" data-act="delete">حذف</button>`)).join('');
     // مجموع المبالغ المعروضة لكل عملة ونوع
     const sums = {};
     for (const d of rows) {
       const k = d.type + '|' + (d.currency || 'IQD');
-      sums[k] = (sums[k] || 0) + Number((d.data && d.data.total) || 0);
+      sums[k] = (sums[k] || 0) + money(d).total;
     }
-    $('#archive-foot').innerHTML = rows.length ? `<tr><td colspan="6" class="muted">${rows.length} مستند — ` +
+    $('#archive-foot').innerHTML = rows.length ? `<tr><td colspan="7" class="muted">${rows.length} مستند — ` +
       Object.entries(sums).map(([k, v]) => { const [t, c] = k.split('|'); return `${esc(St.DOC_TYPES[t].label)}: <b dir="ltr">${esc(formatMoney(v, c))}</b>`; }).join(' · ') +
       '</td></tr>' : '';
     $('#archive-empty').hidden = rows.length > 0;
   }
 
   async function archiveAction(act, path) {
-    const doc = archiveDocs.find((d) => d._path === path);
+    const doc = archiveDocs.find((d) => d._path === path) || dashDocs.find((d) => d._path === path);
     if (!doc) return;
     if (act === 'open' || act === 'copy') {
       if (await window.Issue.open(doc, act === 'copy')) switchTab('issue');
@@ -147,7 +297,7 @@
       if (!confirm(`حذف المستند ${label} نهائياً من المجلد؟`)) return;
       await St.deleteDocument(path);
       toast('تم حذف ' + label);
-      renderArchive(true);
+      switchTab(currentTab);
     }
   }
 
@@ -313,7 +463,42 @@
     if (await S.grantPending()) openApp();
     else showGate('needs-permission', 'لم يتم السماح بالوصول للمجلد.');
   });
-  $('#tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab); });
+  $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) switchTab(b.dataset.tab); });
+  // أزرار التنقل والإصدار السريع في أي مكان
+  $('#app').addEventListener('click', (e) => {
+    const go = e.target.closest('[data-goto]');
+    if (go && !go.closest('#issue-form')) return switchTab(go.dataset.goto);
+    const nw = e.target.closest('[data-new]');
+    if (nw) return newFor(nw.dataset.new);
+  });
+  $('#btn-top-new').addEventListener('click', () => newFor((window.Issue.current && window.Issue.current.type) || 'sales'));
+  $('#dash-backup').addEventListener('click', () => downloadBackup().catch((e) => toast(e.message, true)));
+  $('#dash-period').addEventListener('change', () => renderDashboard().catch((e) => toast(e.message, true)));
+  $('#dash-recent').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (b) archiveAction(b.dataset.act, b.closest('tr').dataset.path).catch((err) => toast(err.message, true));
+  });
+  $('#cust-search').addEventListener('input', () => renderCustomers(false));
+  $('#cust-sort').addEventListener('change', () => renderCustomers(false));
+  $('#customers-grid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cust]');
+    if (!b) return;
+    const c = custList[Number(b.closest('.customer').dataset.i)];
+    if (b.dataset.cust === 'history') {
+      $('#archive-search').value = c.name; $('#archive-status').value = ''; $('#archive-type').value = '';
+      switchTab('archive');
+    } else newFor(b.dataset.cust, c).catch((err) => toast(err.message, true));
+  });
+  $('#archive-status').addEventListener('change', () => renderArchive(false));
+
+  // ----- الوضع الليلي -----
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    $('#theme-icon').textContent = t === 'dark' ? '☀️' : '🌙';
+    try { localStorage.setItem('im-theme', t); } catch (e) { /* تجاهل */ }
+  }
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+  $('#btn-theme').addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
   $('#archive-type').addEventListener('change', () => renderArchive(true));
   $('#archive-search').addEventListener('input', () => renderArchive(false));
   $('#archive-body').addEventListener('click', (e) => {
