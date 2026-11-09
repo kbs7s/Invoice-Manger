@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>مدير الفواتير والوصولات</title>
+  <link rel="stylesheet" href="app/fonts/fonts.css">
   <link rel="stylesheet" href="app/styles.css">
+  <link rel="stylesheet" href="app/sheet.css">
 </head>
 <body>
 
@@ -83,10 +85,37 @@
 
       <!-- القوالب -->
       <section class="panel" data-panel="templates" hidden>
-        <div class="card">
-          <h2>القوالب</h2>
-          <div id="templates-list" class="grid"></div>
-          <p class="muted empty" id="templates-empty" hidden>القوالب المحوّلة من تصاميمك تُضاف في الخطوة الثانية.</p>
+        <div class="tpl-layout">
+          <div class="card tpl-side">
+            <h2>القوالب</h2>
+            <div id="templates-list" class="tpl-list"></div>
+
+            <h2>المعاينة</h2>
+            <div class="form-grid one">
+              <label>نوع المستند<select id="pv-type"></select></label>
+              <label>المقاس<select id="pv-size"></select></label>
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="pv-blank"> نموذج فارغ للكتابة اليدوية</label>
+              <label class="check"><input type="checkbox" id="pv-watermark"> علامة مائية</label>
+            </div>
+
+            <h2>ألوان القالب</h2>
+            <div class="colors">
+              <label>الرئيسي<input type="color" id="pv-c-primary"></label>
+              <label>الغامق<input type="color" id="pv-c-dark"></label>
+              <label>الإبراز<input type="color" id="pv-c-accent"></label>
+            </div>
+            <div class="row actions">
+              <button class="btn primary" id="btn-tpl-save">حفظ الألوان</button>
+              <button class="btn ghost" id="btn-tpl-reset">الألوان الأصلية</button>
+            </div>
+            <div class="row actions">
+              <button class="btn ghost" id="btn-tpl-print">🖨️ طباعة المعاينة</button>
+            </div>
+            <p class="muted" id="pv-note"></p>
+          </div>
+          <div class="sheet-preview" id="pv-area"></div>
         </div>
       </section>
 
@@ -101,7 +130,9 @@
             <label>العنوان<input name="company.address"></label>
             <label>الهاتف<input name="company.phone" dir="ltr"></label>
             <label>البريد الإلكتروني<input name="company.email" dir="ltr"></label>
-            <label>الشعار
+            <label>حروف الشعار (إذا ما في صورة)<input name="company.logoSymbol" maxlength="4" dir="ltr" placeholder="مثلاً: AB"></label>
+            <label>نص صغير تحت الحروف<input name="company.logoText" dir="ltr" placeholder="COMPANY NAME"></label>
+            <label>صورة الشعار
               <div class="logo-field">
                 <img id="logo-preview" alt="">
                 <input type="file" id="logo-input" accept="image/*">
@@ -116,7 +147,8 @@
             <label>مقاس الورق<select name="defaults.size" id="sel-size"></select></label>
           </div>
 
-          <h2>بادئة الترقيم</h2>
+          <h2>عناوين المستندات والترقيم</h2>
+          <p class="muted">العنوان يظهر على المستند (مثلاً: قائمة بيع وتجهيز مواد)، والبادئة تظهر قبل الرقم.</p>
           <div class="form-grid" id="prefix-fields"></div>
 
           <div class="row actions">
@@ -132,6 +164,9 @@
 
   <script src="app/storage.js"></script>
   <script src="app/store.js"></script>
+  <script src="app/render.js"></script>
+  <script src="app/templates/classic.js"></script>
+  <script src="app/templates/modern.js"></script>
   <script src="app/app.js"></script>
 </body>
 </html>

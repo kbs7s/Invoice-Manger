@@ -33,9 +33,13 @@
   const DEFAULT_SETTINGS = {
     company: {
       name: '', subtitle: '', address: '', phone: '', email: '',
-      logo: '', // صورة بصيغة data URL
+      logo: '',        // صورة بصيغة data URL
+      logoSymbol: '',  // حروف تظهر مكان الشعار إذا لم توجد صورة
+      logoText: '',    // نص لاتيني صغير تحت الحروف
     },
-    defaults: { currency: 'IQD', size: 'A4' },
+    defaults: { currency: 'IQD', size: 'A4', templateId: 'classic', watermark: true },
+    titles: Object.fromEntries(Object.entries(DOC_TYPES).map(([k, v]) => [k, v.label])),
+    templateThemes: {}, // ألوان مخصصة لكل قالب: { classic: { primary, dark, accent } }
     prefixes: Object.fromEntries(Object.entries(DOC_TYPES).map(([k, v]) => [k, v.prefix])),
   };
 

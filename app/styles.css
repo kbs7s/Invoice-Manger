@@ -89,3 +89,24 @@ input:focus, select:focus { outline: 2px solid #99f6e4; border-color: var(--prim
   .tabs { order: 3; width: 100%; }
   .tabs button { padding: 10px; }
 }
+
+/* تبويب القوالب */
+.tpl-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+.tpl-side { position: sticky; top: 72px; }
+.tpl-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 4px; }
+.tpl-list .tpl { text-align: right; font: inherit; background: #fff; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.tpl-list .tpl.active { border-color: var(--primary); box-shadow: 0 0 0 2px #99f6e4; }
+.tpl-list .tpl .muted { font-size: 12.5px; }
+.badge.default { background: #fef3c7; color: #92400e; }
+.form-grid.one { grid-template-columns: 1fr 1fr; }
+.checks { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }
+.colors { display: flex; gap: 12px; margin-top: 8px; }
+.colors label { align-items: center; font-size: 13px; }
+.colors input[type=color] { width: 54px; height: 34px; padding: 2px; }
+.tpl-side .actions { margin-top: 12px; }
+.sheet-preview { max-height: calc(100vh - 110px); }
+.sheet-preview .sheet { zoom: calc(var(--zoom, 1) * 0.8); }
+main:has([data-panel=templates]:not([hidden])) { max-width: 1400px; }
+@media (max-width: 900px) { .tpl-layout { grid-template-columns: 1fr; } .tpl-side { position: static; } }
+.tpl-list .tpl .badge.default { align-self: flex-start; }
