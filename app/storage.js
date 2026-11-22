@@ -87,12 +87,12 @@
     const handle = await window.showDirectoryPicker({ id: 'invoice-manager', mode: 'readwrite' });
     if (!(await hasPermission(handle, true))) throw new Error('لم يتم منح إذن الكتابة على المجلد');
     await idbSet(IDB_KEY, handle);
-    root = handle;
+    root = handle; mem = null;
     return handle;
   }
 
   /** للاختبار أو للاستخدام مع مجلد جاهز (مثل OPFS) */
-  function useHandle(handle) { root = handle; }
+  function useHandle(handle) { root = handle; mem = null; }
 
   async function forget() { root = null; pending = null; await idbDel(IDB_KEY); }
 
@@ -101,8 +101,23 @@
     return root;
   }
 
+  // ---------- وضع السحابة فقط (بدون مجلد) ----------
+  // الملفات تُحفظ في الذاكرة وتُرفع إلى GitHub عبر cloud.js. يُستخدم على الأجهزة التي لا تدعم المجلدات (مثل الهاتف).
+  let mem = null; // Map: path -> text
+  function useMemory(entries) { mem = new Map(Object.entries(entries || {})); root = null; }
+
+  // إشعار طبقة المزامنة بكل تغيير (إلا أثناء التنزيل من السحابة)
+  let silent = 0;
+  function notify(path, op) {
+    if (silent || !path.endsWith('.json') || !window.Cloud) return;
+    try { window.Cloud.changed(path, op); } catch (e) { console.warn(e); }
+  }
+  async function quietly(fn) { silent++; try { return await fn(); } finally { silent--; } }
+
   // ---------- عمليات الملفات ----------
   function split(path) { return path.split('/').filter(Boolean); }
+  const norm = (path) => split(path).join('/');
+  function memMissing(path) { const e = new Error('الملف غير موجود: ' + path); e.name = 'NotFoundError'; return e; }
 
   async function dir(path, create) {
     let h = requireRoot();
@@ -118,19 +133,25 @@
   }
 
   async function exists(path) {
+    if (mem) return mem.has(norm(path));
     try { await fileHandle(path, false); return true; } catch (e) { return false; }
   }
 
   async function readText(path) {
+    if (mem) { if (!mem.has(norm(path))) throw memMissing(path); return mem.get(norm(path)); }
     const fh = await fileHandle(path, false);
     return (await fh.getFile()).text();
   }
 
   async function writeText(path, text) {
-    const fh = await fileHandle(path, true);
-    const w = await fh.createWritable();
-    await w.write(text);
-    await w.close();
+    if (mem) mem.set(norm(path), text);
+    else {
+      const fh = await fileHandle(path, true);
+      const w = await fh.createWritable();
+      await w.write(text);
+      await w.close();
+    }
+    notify(norm(path), 'put');
   }
 
   async function readJSON(path, fallback) {
@@ -150,14 +171,29 @@
   }
 
   async function remove(path) {
+    if (mem) {
+      if (!mem.delete(norm(path))) throw memMissing(path);
+      return notify(norm(path), 'del');
+    }
     const parts = split(path);
     const name = parts.pop();
     const d = await dir(parts.join('/'), false);
     await d.removeEntry(name);
+    notify(norm(path), 'del');
   }
 
   /** يرجع قائمة بالعناصر داخل مسار: [{name, kind}] */
   async function list(path) {
+    if (mem) {
+      const prefix = norm(path) ? norm(path) + '/' : '';
+      const seen = new Map();
+      for (const k of mem.keys()) {
+        if (!k.startsWith(prefix)) continue;
+        const rest = k.slice(prefix.length).split('/');
+        seen.set(rest[0], { name: rest[0], kind: rest.length > 1 ? 'directory' : 'file' });
+      }
+      return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
     let d;
     try { d = await dir(path, false); } catch (e) { return []; }
     const out = [];
@@ -170,7 +206,7 @@
   async function walkJSON(path) {
     const out = [];
     for (const e of await list(path)) {
-      const p = path + '/' + e.name;
+      const p = path ? path + '/' + e.name : e.name;
       if (e.kind === 'directory') out.push(...(await walkJSON(p)));
       else if (e.name.endsWith('.json')) out.push(p);
     }
@@ -179,10 +215,11 @@
 
   window.Storage = {
     supported,
-    restore, grantPending, pick, useHandle, forget,
-    get ready() { return !!root; },
-    get folderName() { return root ? root.name : (pending ? pending.name : ''); },
-    ensureDir: (p) => dir(p, true),
+    restore, grantPending, pick, useHandle, useMemory, forget, quietly,
+    get ready() { return !!root || !!mem; },
+    get mode() { return mem ? 'cloud' : 'folder'; },
+    get folderName() { return mem ? 'GitHub (بدون مجلد)' : root ? root.name : (pending ? pending.name : ''); },
+    ensureDir: async (p) => { if (!mem) await dir(p, true); },
     exists, readText, writeText, readJSON, writeJSON, remove, list, walkJSON,
   };
 })();

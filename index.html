@@ -19,7 +19,7 @@
 
       <div id="gate-unsupported" hidden>
         <p class="warn">هذا المتصفح لا يدعم الحفظ داخل مجلد على الجهاز.</p>
-        <p>افتح البرنامج باستخدام <b>Google Chrome</b> أو <b>Microsoft Edge</b>.</p>
+        <p>افتح البرنامج باستخدام <b>Google Chrome</b> أو <b>Microsoft Edge</b> على الحاسبة، أو استخدم الحفظ على GitHub من الأسفل.</p>
       </div>
 
       <div id="gate-new" hidden>
@@ -33,6 +33,17 @@
         <p class="muted">المتصفح يطلب تأكيد السماح بالوصول للمجلد في كل مرة تفتح البرنامج.</p>
         <button class="btn primary big" id="btn-resume">متابعة العمل</button>
         <button class="btn link" id="btn-pick-other">اختيار مجلد آخر</button>
+      </div>
+
+      <div class="gate-cloud" id="gate-cloud">
+        <div class="or"><span>أو</span></div>
+        <div id="gate-cloud-ready" hidden>
+          <p>مستودع البيانات: <b id="gate-cloud-email" dir="ltr"></b></p>
+          <button class="btn big" id="btn-gate-cloud">فتح بياناتي من GitHub</button>
+          <p class="muted">بدون مجلد: البيانات تُقرأ وتُحفظ في مستودع GitHub مباشرة. يناسب الهاتف أو جهاز آخر.</p>
+        </div>
+        <button class="btn link" id="btn-gate-cloud-setup">الحفظ على GitHub بدون مجلد</button>
+        <div id="gate-cloud-form" class="cloud-form" hidden></div>
       </div>
 
       <p id="gate-error" class="error" hidden></p>
@@ -56,6 +67,7 @@
           <span class="dot"></span><span id="folder-name"></span>
           <button class="btn small ghost" id="btn-change-folder">تغيير</button>
         </div>
+        <button class="cloud-pill" id="cloud-pill" data-goto="settings" title="حالة الحفظ على السحابة" hidden><span class="cdot"></span><span id="cloud-pill-text"></span></button>
         <button class="btn icon ghost" id="btn-theme" title="الوضع الليلي / النهاري"><span id="theme-icon">🌙</span></button>
         <button class="btn primary small" id="btn-top-new">+ مستند جديد</button>
       </div>
@@ -328,6 +340,39 @@
             <button class="btn ghost" type="button" id="btn-export">تنزيل نسخة احتياطية</button>
           </div>
         </form>
+
+        <div class="card" id="cloud-card" style="max-width:1100px;margin-inline:auto">
+          <div class="card-head">
+            <div>
+              <h2>الحفظ على GitHub</h2>
+              <p class="muted">نسخة من كل شيء في مستودع GitHub خاص: بيانات الجهة، القالب المختار وألوانه، الترقيم، وكل الفواتير والوصولات (نفس ملفات المجلد). المجلد يبقى هو الأساس ويعمل بدون إنترنت، والرفع يصير تلقائياً عند توفر الاتصال.</p>
+            </div>
+            <span class="badge" id="cloud-badge">غير متصل</span>
+          </div>
+          <div class="cloud-form" id="settings-cloud-form"></div>
+          <div class="row actions" id="cloud-actions" hidden>
+            <button class="btn primary" type="button" id="btn-cloud-upload">⬆ رفع كل البيانات الآن</button>
+            <button class="btn" type="button" id="btn-cloud-download">⬇ تنزيل من GitHub إلى المجلد</button>
+            <label class="check"><input type="checkbox" id="cloud-auto"> رفع تلقائي عند كل حفظ</label>
+            <button class="btn ghost danger" type="button" id="btn-cloud-signout">فصل GitHub</button>
+          </div>
+          <details class="cloud-help">
+            <summary>طريقة التجهيز أول مرة (3 دقائق)</summary>
+            <ol>
+              <li>من GitHub أنشئ مستودعاً جديداً <b>خاصاً (Private)</b> للبيانات، مثلاً <code>invoice-data</code>. لا تستخدم مستودع البرنامج نفسه.</li>
+              <li>افتح <code>github.com/settings/personal-access-tokens/new</code> (Fine-grained token):
+                <ul>
+                  <li>Repository access: <b>Only select repositories</b> واختر مستودع البيانات فقط.</li>
+                  <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b>.</li>
+                  <li>Expiration: اختر مدة طويلة (سنة مثلاً).</li>
+                </ul>
+              </li>
+              <li>انسخ الرمز (يبدأ بـ <code>github_pat_</code>) والصقه هنا مع اسم المستودع بشكل <code>اسمك/invoice-data</code>، واضغط <b>ربط بـ GitHub</b>.</li>
+              <li>على أي جهاز ثاني أو الهاتف: نفس الرمز ونفس المستودع.</li>
+            </ol>
+            <p class="muted">الرمز يُحفظ في هذا المتصفح فقط ولا يُرفع لأي مكان. إذا ضاع الجهاز، احذف الرمز من نفس صفحة GitHub.</p>
+          </details>
+        </div>
       </section>
     </main>
   </div>
@@ -336,6 +381,7 @@
 
   <script src="app/storage.js"></script>
   <script src="app/store.js"></script>
+  <script src="app/cloud.js"></script>
   <script src="app/render.js"></script>
   <script src="app/templates/classic.js"></script>
   <script src="app/templates/modern.js"></script>

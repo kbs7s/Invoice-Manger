@@ -47,11 +47,67 @@
     $('#gate-folder').textContent = S.folderName;
     $('#gate-error').hidden = !error;
     $('#gate-error').textContent = error || '';
+    const C = window.Cloud;
+    $('#gate-cloud-ready').hidden = !C.signedIn();
+    $('#gate-cloud-email').textContent = C.config.repo || '';
+    $('#btn-gate-cloud-setup').hidden = C.signedIn();
+    $('#gate-cloud-form').hidden = true;
+  }
+
+  // ---------- الحفظ على GitHub ----------
+  function cloudFormHTML(prefix) {
+    const c = window.Cloud.config;
+    return `
+      <div class="form-grid">
+        <label>المستودع (اسم المستخدم/اسم المستودع)<input id="${prefix}-repo" dir="ltr" autocomplete="off" spellcheck="false" placeholder="kbs7s/invoice-data" value="${esc(c.repo || '')}"></label>
+        <label>الرمز (Personal Access Token)<input id="${prefix}-token" type="password" dir="ltr" autocomplete="off" spellcheck="false" placeholder="github_pat_..."></label>
+      </div>
+      <div class="row">
+        <button type="button" class="btn primary" data-cloud="connect">ربط بـ GitHub</button>
+      </div>`;
+  }
+  async function cloudSignIn(prefix) {
+    const repo = $(`#${prefix}-repo`).value.trim();
+    const token = $(`#${prefix}-token`).value.trim();
+    if (!token) throw new Error('أدخل الرمز (Personal Access Token) من GitHub');
+    await window.Cloud.connect(token, repo);
+    $(`#${prefix}-token`).value = '';
+  }
+  /** يفتح البرنامج على بيانات السحابة بدون مجلد */
+  async function openCloud() {
+    $('#gate-error').hidden = true;
+    const n = await window.Cloud.openCloudWorkspace();
+    window.Cloud.configure({ cloudOnly: true });
+    await openApp();
+    toast(n ? `تم تحميل ${n} ملف من GitHub` : 'المستودع فارغ، ابدأ بتعبئة بيانات الجهة من الإعدادات');
+  }
+
+  function renderCloud() {
+    const C = window.Cloud;
+    const on = C.signedIn();
+    $('#settings-cloud-form').innerHTML = on
+      ? `<p>متصل بالمستودع <a href="https://github.com/${esc(C.config.repo)}" target="_blank" rel="noopener" dir="ltr">${esc(C.config.repo)}</a> (حساب <b dir="ltr">${esc(C.config.login)}</b>). ${S.mode === 'cloud' ? 'تعمل الآن من GitHub مباشرة (بدون مجلد).' : 'كل حفظ بالمجلد يُرفع تلقائياً.'}</p>`
+      : cloudFormHTML('c');
+    $('#cloud-actions').hidden = !on;
+    $('#btn-cloud-download').hidden = S.mode === 'cloud';
+    $('#cloud-auto').checked = C.config.autoSync !== false;
+  }
+  function showCloudStatus(st) {
+    const C = window.Cloud;
+    const pill = $('#cloud-pill');
+    pill.hidden = !C.signedIn();
+    pill.dataset.state = st.state;
+    $('#cloud-pill-text').textContent = st.state === 'error' ? 'خطأ بالحفظ على GitHub' : 'GitHub: ' + (st.message || 'متصل');
+    pill.title = 'الحفظ على GitHub: ' + (st.message || '');
+    const badge = $('#cloud-badge');
+    badge.className = 'badge ' + ({ idle: 'success', syncing: 'primary', error: 'danger' }[st.state] || '');
+    badge.textContent = C.signedIn() ? (st.state === 'error' ? 'خطأ: ' + st.message : st.message || 'متصل') : 'غير متصل';
   }
 
   async function pickFolder() {
     try {
       await S.pick();
+      window.Cloud.configure({ cloudOnly: false });
       await openApp();
     } catch (e) {
       if (e.name === 'AbortError') return; // المستخدم أغلق النافذة
@@ -60,10 +116,15 @@
   }
 
   async function boot() {
-    if (!S.supported) return showGate('unsupported');
+    const cloudOnly = () => window.Cloud.signedIn() && window.Cloud.config.cloudOnly;
+    if (!S.supported) {
+      if (window.Cloud.signedIn()) return openCloud().catch((e) => showGate('unsupported', e.message));
+      return showGate('unsupported');
+    }
     const state = await S.restore();
-    if (state === 'ready') return openApp();
-    showGate(state);
+    if (state === 'ready' && !cloudOnly()) return openApp();
+    if (cloudOnly()) return openCloud().catch((e) => showGate(state, e.message));
+    showGate(state === 'ready' ? 'none' : state);
   }
 
   // ---------- البرنامج ----------
@@ -75,6 +136,8 @@
     $('#gate').hidden = true;
     $('#app').hidden = false;
     $('#folder-name').textContent = S.folderName;
+    $('#btn-change-folder').hidden = !S.supported;
+    $('#btn-change-folder').textContent = S.mode === 'cloud' ? 'استخدام مجلد' : 'تغيير';
     switchTab(currentTab);
   }
 
@@ -426,6 +489,7 @@
       `<label>بادئة ترقيم ${esc(v.label)}<input name="prefixes.${k}" dir="ltr"></label>`).join('');
     $$('[name]', form).forEach((el) => { el.value = getPath(settings, el.name) || ''; });
     $('#logo-preview').src = settings.company.logo || '';
+    renderCloud();
   }
 
   async function saveSettingsForm(ev) {
@@ -439,7 +503,7 @@
 
   function readLogo(file) {
     if (!file) return;
-    if (file.size > 1024 * 1024) return toast('حجم الشعار كبير، اختر صورة أقل من 1MB', true);
+    if (file.size > 500 * 1024) return toast('حجم الشعار كبير، اختر صورة أقل من 500KB', true);
     const r = new FileReader();
     r.onload = () => { $('#logo-preview').src = r.result; };
     r.readAsDataURL(file);
@@ -460,7 +524,7 @@
   $('#btn-pick-other').addEventListener('click', pickFolder);
   $('#btn-change-folder').addEventListener('click', pickFolder);
   $('#btn-resume').addEventListener('click', async () => {
-    if (await S.grantPending()) openApp();
+    if (await S.grantPending()) { window.Cloud.configure({ cloudOnly: false }); openApp(); }
     else showGate('needs-permission', 'لم يتم السماح بالوصول للمجلد.');
   });
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) switchTab(b.dataset.tab); });
@@ -557,6 +621,56 @@
     get settings() { return settings; },
     set settings(v) { settings = v; },
   };
+
+  // ----- أحداث السحابة -----
+  window.Cloud.onStatus(showCloudStatus);
+  $('#btn-gate-cloud-setup').addEventListener('click', () => {
+    $('#gate-cloud-form').innerHTML = cloudFormHTML('g');
+    $('#gate-cloud-form').hidden = false;
+    $('#btn-gate-cloud-setup').hidden = true;
+  });
+  $('#btn-gate-cloud').addEventListener('click', () => openCloud().catch((e) => showGate(S.supported ? (S.folderName ? 'needs-permission' : 'none') : 'unsupported', e.message)));
+  $('#gate-cloud-form').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-cloud]');
+    if (!b) return;
+    b.disabled = true;
+    try { await cloudSignIn('g'); await openCloud(); }
+    catch (err) { $('#gate-error').hidden = false; $('#gate-error').textContent = err.message; }
+    finally { b.disabled = false; }
+  });
+  $('#settings-cloud-form').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-cloud]');
+    if (!b) return;
+    b.disabled = true;
+    try {
+      await cloudSignIn('c');
+      renderCloud();
+      const remote = Object.keys(await window.Cloud.fetchAll()).filter((p) => p !== 'workspace.json').length;
+      if (!remote) { await window.Cloud.uploadAll(); toast('تم الربط ورفع كل البيانات إلى GitHub'); }
+      else toast(`تم الربط. المستودع فيه ${remote} ملف: اختر رفع أو تنزيل`);
+    } catch (err) { toast(err.message, true); }
+    finally { b.disabled = false; }
+  });
+  $('#btn-cloud-upload').addEventListener('click', async () => {
+    try { await window.Cloud.uploadAll(); toast('تم رفع كل البيانات إلى GitHub'); }
+    catch (err) { toast('تعذّر الرفع: ' + err.message, true); }
+  });
+  $('#btn-cloud-download').addEventListener('click', async () => {
+    if (!confirm('تنزيل البيانات من GitHub إلى المجلد؟ الملفات بنفس الرقم تُستبدل بنسخة GitHub.')) return;
+    try {
+      const n = await window.Cloud.downloadAll();
+      settings = await St.getSettings();
+      toast(`تم تنزيل ${n} ملف من GitHub`);
+      renderSettings();
+    } catch (err) { toast('تعذّر التنزيل: ' + err.message, true); }
+  });
+  $('#cloud-auto').addEventListener('change', (e) => { window.Cloud.configure({ autoSync: e.target.checked }); if (e.target.checked) window.Cloud.flush().catch(() => {}); });
+  $('#btn-cloud-signout').addEventListener('click', () => {
+    if (!confirm('فصل GitHub عن هذا الجهاز؟ بياناتك تبقى محفوظة بالمستودع.')) return;
+    window.Cloud.signOut();
+    if (S.mode === 'cloud') location.reload();
+    else renderCloud();
+  });
 
   boot().catch((e) => showGate('none', e.message));
 })();
