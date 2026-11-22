@@ -1,0 +1,21 @@
+{
+  "id": "simple-example",
+  "name": "مثال بسيط (مستورد)",
+  "description": "مثال على صيغة القوالب المستوردة. انسخه وعدّل عليه.",
+  "types": [
+    "sales",
+    "receipt"
+  ],
+  "sizes": [
+    "A4",
+    "A5"
+  ],
+  "minRows": 12,
+  "theme": {
+    "primary": "#7c3aed",
+    "dark": "#4c1d95",
+    "accent": "#a78bfa"
+  },
+  "css": ".tpl-simple-example { font-family: 'Cairo', sans-serif; color: #111; }\n.tpl-simple-example .doc { border: 2px solid var(--c-primary); border-radius: 8px; display: flex; flex-direction: column; position: relative; padding: 14px; }\n.tpl-simple-example .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--c-primary); padding-bottom: 10px; }\n.tpl-simple-example .top h1 { margin: 0; color: var(--c-primary); font-size: 26px; }\n.tpl-simple-example .top .logo-img { max-height: 70px; }\n.tpl-simple-example .top .logo-symbol { font: 900 30px serif; color: var(--c-primary); }\n.tpl-simple-example .top .logo-sub { font-size: 10px; letter-spacing: 2px; }\n.tpl-simple-example .meta { display: flex; justify-content: space-between; margin: 10px 0; font-weight: 700; }\n.tpl-simple-example table { width: 100%; border-collapse: collapse; font-size: 13px; }\n.tpl-simple-example th { background: var(--c-primary); color: #fff; padding: 6px; }\n.tpl-simple-example td { border: 1px solid #ccc; padding: 4px 6px; text-align: center; height: 24px; }\n.tpl-simple-example .sum { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 12px; font-weight: 700; }\n.tpl-simple-example .sum table { width: 240px; }",
+  "html": "<div class=\"doc\">{{{watermark}}}\n  <div class=\"top\">\n    <div><h1>{{company.name}}</h1><div>{{company.subtitle}}</div></div>\n    <div>{{{logo}}}</div>\n  </div>\n  <div class=\"meta\">\n    <span>{{title}} رقم: <span class=\"num\">{{number}}</span> {{copyLabel}}</span>\n    <span>التاريخ: <span class=\"num\">{{date}}</span></span>\n  </div>\n  <div class=\"meta\"><span>السيد / الجهة: {{customer}}</span><span>الدفع: {{paymentMethod}}</span></div>\n  {{#isSales}}\n  <table>\n    <thead><tr><th>ت</th><th>المادة</th><th>الكمية</th><th>السعر ({{symbol}})</th><th>المجموع ({{symbol}})</th></tr></thead>\n    <tbody>\n      {{#items}}<tr><td>{{i}}</td><td style=\"text-align:right\">{{name}}</td><td>{{qty}}</td><td class=\"num\">{{price}}</td><td class=\"num\">{{total}}</td></tr>{{/items}}\n      {{#emptyRows}}<tr><td style=\"color:#bbb\">{{i}}</td><td></td><td></td><td></td><td></td></tr>{{/emptyRows}}\n    </tbody>\n  </table>\n  <div class=\"sum\">\n    <div>{{words}}</div>\n    <table>\n      <tr><td>المجموع</td><td class=\"num\">{{subtotal}}</td></tr>\n      <tr><td>الخصم</td><td class=\"num\">{{discount}}</td></tr>\n      {{#hasPrev}}<tr><td>رصيد سابق</td><td class=\"num\">{{prevBalance}}</td></tr>{{/hasPrev}}\n      <tr><td>الواصل</td><td class=\"num\">{{paid}}</td></tr>\n      <tr><td>الباقي</td><td class=\"num\">{{remaining}}</td></tr>\n    </table>\n  </div>\n  {{/isSales}}\n  {{#isReceipt}}\n  <p>استلمنا مبلغاً وقدره <b class=\"num\">{{amount}}</b> ({{words}})</p>\n  <p>وذلك عن: {{purpose}}</p>\n  <p>الملاحظات: {{notes}}</p>\n  <div class=\"sum\"><span>التوقيع: {{receiver}}</span><span>{{company.phone}}</span></div>\n  {{/isReceipt}}\n</div>"
+}

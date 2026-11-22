@@ -1,0 +1,48 @@
+/* الورقة المشتركة بين كل القوالب: المقاس، النسخ، خط القص، والطباعة */
+
+.sheet {
+  width: var(--sheet-w, 210mm);
+  min-height: var(--sheet-h, 297mm);
+  zoom: var(--zoom, 1);
+  background: #fff;
+  color: #11222d;
+  padding: 8mm 10mm;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+  direction: rtl;
+  text-align: right;
+  font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sheet *, .sheet *::before, .sheet *::after { box-sizing: border-box; }
+.sheet.type-receipt { padding: 6mm 10mm; }
+.sheet-inner { flex: 1; display: flex; flex-direction: column; }
+.sheet .copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.sheet .copy > * { flex: 1; }
+.sheet .cut-line { border-top: 1.5px dashed #b6c2cc; margin: 4mm 0; position: relative; height: 0; }
+.sheet .cut-line span { position: absolute; top: -10px; right: 8mm; background: #fff; color: #94a3b8; font-size: 14px; padding: 0 4px; line-height: 1; }
+.sheet .ltr { direction: ltr; unicode-bidi: isolate; }
+.sheet .num { font-family: 'Readex Pro', 'Cairo', monospace; direction: ltr; unicode-bidi: isolate; }
+
+/* العلامة المائية */
+.sheet .wm { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; overflow: hidden; opacity: .04; }
+.sheet .wm img { max-width: 60%; max-height: 60%; filter: grayscale(100%); }
+.sheet .wm span { font-size: 160px; font-weight: 900; font-family: serif; color: var(--c-primary); opacity: .9; }
+
+/* المعاينة على الشاشة */
+.sheet-preview { overflow: auto; background: #4b5563; background-image: radial-gradient(#6b7280 1.2px, transparent 1.2px); background-size: 20px 20px; padding: 24px; border-radius: 10px; }
+.sheet-preview .sheet { margin: 0 auto 24px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.sheet-preview .sheet:last-child { margin-bottom: 0; }
+
+/* الطباعة: تظهر فقط الأوراق الموضوعة في #print-root */
+#print-root { display: none; }
+@media print {
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { display: block !important; }
+  #print-root .sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
+  #print-root .sheet:last-child { break-after: auto; page-break-after: auto; }
+}
