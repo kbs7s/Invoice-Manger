@@ -286,3 +286,26 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); 
   .search { min-width: 0; width: 100%; }
   .brand small { display: none; }
 }
+
+/* ---------- السحابة ---------- */
+.cloud-pill { display: flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; color: var(--muted); background: var(--subtle); border: 1px solid var(--border); border-radius: 99px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.cloud-pill:hover { border-color: var(--primary); color: var(--text); }
+.cloud-pill .cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.cloud-pill[data-state="idle"] .cdot { background: var(--success); }
+.cloud-pill[data-state="syncing"] .cdot { background: var(--info); animation: pulse 1s infinite; }
+.cloud-pill[data-state="error"] .cdot { background: var(--danger); }
+.cloud-pill[data-state="error"] { color: var(--danger); }
+@keyframes pulse { 50% { opacity: .3; } }
+.cloud-form { margin-top: 8px; }
+.cloud-form .form-grid { margin-top: 8px; }
+.cloud-form .row { margin-top: 12px; }
+.cloud-help { margin-top: 18px; background: var(--subtle); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 13.5px; }
+.cloud-help summary { cursor: pointer; font-weight: 700; }
+.cloud-help ol { margin: 10px 0 0; padding-inline-start: 22px; line-height: 1.9; }
+.cloud-help pre { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; font-size: 12px; overflow-x: auto; text-align: left; line-height: 1.5; }
+.gate-cloud { margin-top: 20px; text-align: right; }
+.gate-cloud .or { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 13px; margin-bottom: 10px; }
+.gate-cloud .or::before, .gate-cloud .or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.gate-cloud #gate-cloud-ready { text-align: center; }
+.gate-cloud .btn.link { margin: 0 auto; display: block; }
+@media (max-width: 560px) { .cloud-pill #cloud-pill-text { display: none; } .gate-card { padding: 24px 18px; } }
