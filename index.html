@@ -19,7 +19,7 @@
 
       <div id="gate-unsupported" hidden>
         <p class="warn">هذا المتصفح لا يدعم الحفظ داخل مجلد على الجهاز.</p>
-        <p>افتح البرنامج باستخدام <b>Google Chrome</b> أو <b>Microsoft Edge</b> على الحاسبة، أو استخدم الحفظ على السحابة من الأسفل.</p>
+        <p>افتح البرنامج باستخدام <b>Google Chrome</b> أو <b>Microsoft Edge</b>.</p>
       </div>
 
       <div id="gate-new" hidden>
@@ -33,17 +33,6 @@
         <p class="muted">المتصفح يطلب تأكيد السماح بالوصول للمجلد في كل مرة تفتح البرنامج.</p>
         <button class="btn primary big" id="btn-resume">متابعة العمل</button>
         <button class="btn link" id="btn-pick-other">اختيار مجلد آخر</button>
-      </div>
-
-      <div class="gate-cloud" id="gate-cloud">
-        <div class="or"><span>أو</span></div>
-        <div id="gate-cloud-ready" hidden>
-          <p>حساب السحابة: <b id="gate-cloud-email"></b></p>
-          <button class="btn big" id="btn-gate-cloud">☁ فتح بياناتي من السحابة</button>
-          <p class="muted">بدون مجلد: البيانات تُحفظ في Firebase مباشرة. يناسب الهاتف أو جهاز آخر.</p>
-        </div>
-        <button class="btn link" id="btn-gate-cloud-setup">☁ استخدام السحابة (Firebase) بدون مجلد</button>
-        <div id="gate-cloud-form" class="cloud-form" hidden></div>
       </div>
 
       <p id="gate-error" class="error" hidden></p>
@@ -67,7 +56,6 @@
           <span class="dot"></span><span id="folder-name"></span>
           <button class="btn small ghost" id="btn-change-folder">تغيير</button>
         </div>
-        <button class="cloud-pill" id="cloud-pill" data-goto="settings" title="حالة الحفظ على السحابة" hidden><span class="cdot"></span><span id="cloud-pill-text"></span></button>
         <button class="btn icon ghost" id="btn-theme" title="الوضع الليلي / النهاري"><span id="theme-icon">🌙</span></button>
         <button class="btn primary small" id="btn-top-new">+ مستند جديد</button>
       </div>
@@ -340,42 +328,6 @@
             <button class="btn ghost" type="button" id="btn-export">تنزيل نسخة احتياطية</button>
           </div>
         </form>
-
-        <div class="card" id="cloud-card" style="max-width:1100px;margin-inline:auto">
-          <div class="card-head">
-            <div>
-              <h2>☁ الحفظ على السحابة (Firebase)</h2>
-              <p class="muted">نسخة من كل شيء على حسابك في Firebase: بيانات الجهة، القالب المختار وألوانه، الترقيم، وكل الفواتير والوصولات. المجلد يبقى هو الأساس ويعمل بدون إنترنت، والرفع يصير تلقائياً عند توفر الاتصال.</p>
-            </div>
-            <span class="badge" id="cloud-badge">غير متصل</span>
-          </div>
-          <div class="cloud-form" id="settings-cloud-form"></div>
-          <div class="row actions" id="cloud-actions" hidden>
-            <button class="btn primary" type="button" id="btn-cloud-upload">⬆ رفع كل البيانات الآن</button>
-            <button class="btn" type="button" id="btn-cloud-download">⬇ تنزيل من السحابة إلى المجلد</button>
-            <label class="check"><input type="checkbox" id="cloud-auto"> رفع تلقائي عند كل حفظ</label>
-            <button class="btn ghost danger" type="button" id="btn-cloud-signout">تسجيل الخروج</button>
-          </div>
-          <details class="cloud-help">
-            <summary>طريقة التجهيز أول مرة (5 دقائق)</summary>
-            <ol>
-              <li>ادخل <code>console.firebase.google.com</code> وأنشئ مشروعاً جديداً.</li>
-              <li><b>Authentication</b> ← Get started ← فعّل <b>Email/Password</b>.</li>
-              <li><b>Firestore Database</b> ← Create database (أي منطقة) ← Production mode.</li>
-              <li>بنفس الصفحة افتح تبويب <b>Rules</b>، الصق القواعد التالية ثم Publish. هذه القواعد تخلي كل حساب يشوف بياناته فقط:
-<pre dir="ltr">rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == uid;
-    }
-  }
-}</pre></li>
-              <li>⚙ Project settings ← General ← انسخ <b>Web API Key</b> و <b>Project ID</b> والصقهم هنا. (إذا ما يظهر المفتاح: أضف تطبيق Web من نفس الصفحة.)</li>
-              <li>اضغط <b>إنشاء حساب</b> بأول مرة، وبعدها <b>تسجيل الدخول</b> على أي جهاز ثاني بنفس البريد.</li>
-            </ol>
-          </details>
-        </div>
       </section>
     </main>
   </div>
@@ -384,7 +336,6 @@ service cloud.firestore {
 
   <script src="app/storage.js"></script>
   <script src="app/store.js"></script>
-  <script src="app/cloud.js"></script>
   <script src="app/render.js"></script>
   <script src="app/templates/classic.js"></script>
   <script src="app/templates/modern.js"></script>
