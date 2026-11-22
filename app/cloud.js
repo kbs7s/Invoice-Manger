@@ -21,7 +21,16 @@
 
   function load(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
   function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* تجاهل */ } }
-  let conf = load(CONF_KEY, {});     // { token, repo: 'owner/name', branch, login, autoSync, cloudOnly }
+  let conf = load(CONF_KEY, {});     // { repo: 'owner/name', branch, login, autoSync, cloudOnly } + token في الذاكرة فقط
+  // الرمز لا يُحفظ نصاً عادياً: يُحفظ مشفّراً بكلمة سر الدخول (auth.js) ويُقرأ بعد فتح القفل
+  const legacyToken = conf.token; // نسخ قديمة كانت تحفظه مكشوفاً، ننقله للخزنة المشفّرة
+  delete conf.token;
+  function saveConf() {
+    save(CONF_KEY, { ...conf, token: undefined });
+    if (window.Auth && window.Auth.unlocked && window.Auth.getSecret('github') !== conf.token) {
+      return window.Auth.setSecret('github', conf.token || null).catch((e) => console.error(e));
+    }
+  }
   let pending = load(PENDING_KEY, {}); // path -> 'put' | 'del'
   let shas = load(SHA_KEY, {});        // path -> sha آخر نسخة معروفة على GitHub
   let status = { state: 'off', message: '' };
@@ -103,7 +112,7 @@
     const changedRepo = conf.repo !== info.full_name;
     conf = { ...conf, token, repo: info.full_name, branch: info.default_branch || 'main', login: user.login };
     if (changedRepo) { shas = {}; save(SHA_KEY, shas); }
-    save(CONF_KEY, conf);
+    saveConf();
     setStatus('idle', 'متصل');
     return conf;
   }
@@ -111,7 +120,7 @@
   function signOut() {
     conf = { autoSync: conf.autoSync };
     shas = {}; save(SHA_KEY, shas);
-    save(CONF_KEY, conf);
+    saveConf();
     setStatus('off');
   }
 
@@ -255,7 +264,15 @@
     next = { ...next };
     delete next.token; delete next.repo; delete next.branch; delete next.login;
     conf = { ...conf, ...next };
-    save(CONF_KEY, conf);
+    saveConf();
+  }
+
+  if (window.Auth) {
+    window.Auth.onUnlock((secrets) => {
+      conf.token = secrets.github || legacyToken || undefined;
+      if (legacyToken) saveConf();
+      if (signedIn()) { setStatus('idle', Object.keys(pending).length ? `${Object.keys(pending).length} بانتظار الرفع` : 'متصل'); if (Object.keys(pending).length && conf.autoSync !== false) schedule(1500); }
+    });
   }
 
   window.addEventListener('online', () => { if (signedIn() && Object.keys(pending).length) schedule(1000); });

@@ -490,7 +490,30 @@
     $$('[name]', form).forEach((el) => { el.value = getPath(settings, el.name) || ''; });
     $('#logo-preview').src = settings.company.logo || '';
     renderCloud();
+    renderSecurity();
   }
+
+  // ---------- الأمان ----------
+  function renderSecurity() {
+    $('#sec-user').textContent = window.Auth.user || '';
+    $('#sec-idle').value = String(window.Auth.idle);
+  }
+  $('#btn-lock').addEventListener('click', () => window.Auth.lock());
+  $('#btn-lock-now').addEventListener('click', () => window.Auth.lock());
+  $('#sec-idle').addEventListener('change', (e) => { window.Auth.setIdle(Number(e.target.value)); toast('تم حفظ مدة القفل التلقائي'); });
+  $('#sec-pass-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    if ($('#sec-new').value !== $('#sec-new2').value) return toast('كلمتا السر الجديدتان غير متطابقتين', true);
+    const btn = f.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await window.Auth.changePassword($('#sec-cur').value, $('#sec-new').value);
+      f.reset();
+      toast('تم تغيير كلمة السر');
+    } catch (err) { toast(err.message, true); }
+    finally { btn.disabled = false; }
+  });
 
   async function saveSettingsForm(ev) {
     ev.preventDefault();
@@ -672,5 +695,5 @@
     else renderCloud();
   });
 
-  boot().catch((e) => showGate('none', e.message));
+  window.Auth.gate().then(boot).catch((e) => showGate('none', e.message));
 })();

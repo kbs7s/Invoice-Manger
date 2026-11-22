@@ -4,12 +4,54 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>مدير الفواتير والوصولات</title>
-  <script>try { var t = localStorage.getItem('im-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <script src="app/theme-init.js"></script>
   <link rel="stylesheet" href="app/fonts/fonts.css">
   <link rel="stylesheet" href="app/styles.css">
   <link rel="stylesheet" href="app/sheet.css">
 </head>
 <body>
+
+  <!-- شاشة الدخول -->
+  <section id="lock" class="gate lock" hidden>
+    <div class="gate-card">
+      <div class="gate-logo">🔒</div>
+      <h1>مدير الفواتير والوصولات</h1>
+
+      <form id="lock-login" class="lock-form" autocomplete="on" hidden>
+        <p class="muted">سجّل الدخول لفتح بياناتك.</p>
+        <label>اسم المستخدم<input id="l-user" name="username" autocomplete="username" required></label>
+        <label>كلمة السر
+          <span class="pass-wrap"><input id="l-pass" name="password" type="password" autocomplete="current-password" required><button type="button" class="btn icon ghost" data-reveal="l-pass" title="إظهار">👁</button></span>
+        </label>
+        <button class="btn primary big" id="l-submit" type="submit">دخول</button>
+        <button class="btn link" type="button" id="btn-forgot">نسيت كلمة السر؟</button>
+      </form>
+
+      <form id="lock-setup" class="lock-form" autocomplete="on" hidden>
+        <p>أنشئ حساب الدخول لهذا الجهاز. كلمة السر تحمي البرنامج وتشفّر رمز GitHub المحفوظ.</p>
+        <label>اسم المستخدم<input id="s-user" name="username" autocomplete="username" minlength="3" required></label>
+        <label>كلمة السر
+          <span class="pass-wrap"><input id="s-pass" name="new-password" type="password" autocomplete="new-password" required><button type="button" class="btn icon ghost" data-reveal="s-pass" title="إظهار">👁</button></span>
+        </label>
+        <div class="meter" id="s-meter"><i></i><i></i><i></i><i></i><span></span></div>
+        <label>تأكيد كلمة السر<input id="s-pass2" type="password" autocomplete="new-password" required></label>
+        <p class="muted small">10 أحرف على الأقل، وامزج حروفاً وأرقاماً ورموزاً. لا يمكن استرجاعها إذا نسيتها، فاحفظها في مكان آمن.</p>
+        <button class="btn primary big" type="submit">إنشاء الحساب والدخول</button>
+      </form>
+
+      <form id="lock-forgot" class="lock-form" hidden>
+        <p class="warn">كلمة السر لا تُحفظ في أي مكان، لذلك لا يمكن استرجاعها.</p>
+        <p>يمكنك إنشاء حساب جديد، لكن سيتم <b>فصل GitHub</b> (تحتاج تدخل الرمز من جديد) و<b>نسيان مجلد العمل</b> (تختاره من جديد). ملفات الفواتير نفسها لا تُحذف.</p>
+        <label>للتأكيد اكتب: مسح<input id="f-confirm" autocomplete="off"></label>
+        <button class="btn danger big" type="submit">مسح وإنشاء حساب جديد</button>
+        <button class="btn link" type="button" id="btn-forgot-back">رجوع</button>
+      </form>
+
+      <p id="lock-msg" class="error" role="alert" hidden></p>
+    </div>
+  </section>
 
   <!-- شاشة اختيار مجلد العمل -->
   <section id="gate" class="gate" hidden>
@@ -68,6 +110,7 @@
           <button class="btn small ghost" id="btn-change-folder">تغيير</button>
         </div>
         <button class="cloud-pill" id="cloud-pill" data-goto="settings" title="حالة الحفظ على السحابة" hidden><span class="cdot"></span><span id="cloud-pill-text"></span></button>
+        <button class="btn icon ghost" id="btn-lock" title="قفل البرنامج">🔒</button>
         <button class="btn icon ghost" id="btn-theme" title="الوضع الليلي / النهاري"><span id="theme-icon">🌙</span></button>
         <button class="btn primary small" id="btn-top-new">+ مستند جديد</button>
       </div>
@@ -341,6 +384,23 @@
           </div>
         </form>
 
+        <div class="card" id="security-card" style="max-width:1100px;margin-inline:auto">
+          <h2>الأمان وتسجيل الدخول</h2>
+          <p class="muted">المستخدم: <b id="sec-user"></b>. كلمة السر لا تُحفظ، ورمز GitHub محفوظ مشفّراً بها (AES-256).</p>
+          <div class="row actions">
+            <label>قفل تلقائي بعد الخمول
+              <select id="sec-idle"><option value="5">5 دقائق</option><option value="15">15 دقيقة</option><option value="30">30 دقيقة</option><option value="60">ساعة</option></select>
+            </label>
+            <button class="btn" type="button" id="btn-lock-now">🔒 قفل الآن</button>
+          </div>
+          <form id="sec-pass-form" class="form-grid" autocomplete="off">
+            <label>كلمة السر الحالية<input type="password" id="sec-cur" autocomplete="current-password" required></label>
+            <label>كلمة السر الجديدة<input type="password" id="sec-new" autocomplete="new-password" required></label>
+            <label>تأكيد الجديدة<input type="password" id="sec-new2" autocomplete="new-password" required></label>
+            <div><button class="btn primary" type="submit">تغيير كلمة السر</button></div>
+          </form>
+        </div>
+
         <div class="card" id="cloud-card" style="max-width:1100px;margin-inline:auto">
           <div class="card-head">
             <div>
@@ -379,6 +439,7 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <script src="app/auth.js"></script>
   <script src="app/storage.js"></script>
   <script src="app/store.js"></script>
   <script src="app/cloud.js"></script>
