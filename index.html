@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>مدير الفواتير والوصولات</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <script src="app/theme-init.js"></script>
   <link rel="stylesheet" href="app/fonts/fonts.css">
@@ -19,34 +19,46 @@
       <div class="gate-logo">🔒</div>
       <h1>مدير الفواتير والوصولات</h1>
 
+      <form id="lock-config" class="lock-form" autocomplete="off" hidden>
+        <p>أول مرة على هذا الجهاز: أدخل إعدادات مشروع Firebase. تجدها في Firebase Console ← Project settings ← Your apps ← Web app.</p>
+        <label>مفتاح API (apiKey)<input id="cfg-key" dir="ltr" spellcheck="false" placeholder="AIza..."></label>
+        <label>معرّف المشروع (projectId)<input id="cfg-project" dir="ltr" spellcheck="false" placeholder="my-invoices"></label>
+        <p class="muted small">يمكنك لصق كتلة firebaseConfig كاملة في الحقل الأول.</p>
+        <button class="btn primary big" type="submit">متابعة</button>
+      </form>
+
       <form id="lock-login" class="lock-form" autocomplete="on" hidden>
-        <p class="muted">سجّل الدخول لفتح بياناتك.</p>
-        <label>اسم المستخدم<input id="l-user" name="username" autocomplete="username" required></label>
+        <p class="muted">سجّل الدخول بحسابك لفتح بياناتك.</p>
+        <label>البريد الإلكتروني<input id="l-email" name="email" type="email" dir="ltr" autocomplete="username" required></label>
         <label>كلمة السر
           <span class="pass-wrap"><input id="l-pass" name="password" type="password" autocomplete="current-password" required><button type="button" class="btn icon ghost" data-reveal="l-pass" title="إظهار">👁</button></span>
         </label>
         <button class="btn primary big" id="l-submit" type="submit">دخول</button>
-        <button class="btn link" type="button" id="btn-forgot">نسيت كلمة السر؟</button>
+        <div class="lock-links">
+          <button class="btn link" type="button" data-show="forgot">نسيت كلمة السر؟</button>
+          <button class="btn link" type="button" data-show="signup">إنشاء حساب</button>
+        </div>
+        <button class="btn link small" type="button" id="btn-change-project" data-show="config">تغيير مشروع Firebase</button>
       </form>
 
-      <form id="lock-setup" class="lock-form" autocomplete="on" hidden>
-        <p>أنشئ حساب الدخول لهذا الجهاز. كلمة السر تحمي البرنامج وتشفّر رمز GitHub المحفوظ.</p>
-        <label>اسم المستخدم<input id="s-user" name="username" autocomplete="username" minlength="3" required></label>
+      <form id="lock-signup" class="lock-form" autocomplete="on" hidden>
+        <p>أنشئ حسابك مرة واحدة، وبعدها تدخل بنفس البريد وكلمة السر من أي جهاز.</p>
+        <label>البريد الإلكتروني<input id="su-email" name="email" type="email" dir="ltr" autocomplete="username" required></label>
         <label>كلمة السر
-          <span class="pass-wrap"><input id="s-pass" name="new-password" type="password" autocomplete="new-password" required><button type="button" class="btn icon ghost" data-reveal="s-pass" title="إظهار">👁</button></span>
+          <span class="pass-wrap"><input id="su-pass" name="new-password" type="password" autocomplete="new-password" required><button type="button" class="btn icon ghost" data-reveal="su-pass" title="إظهار">👁</button></span>
         </label>
-        <div class="meter" id="s-meter"><i></i><i></i><i></i><i></i><span></span></div>
-        <label>تأكيد كلمة السر<input id="s-pass2" type="password" autocomplete="new-password" required></label>
-        <p class="muted small">10 أحرف على الأقل، وامزج حروفاً وأرقاماً ورموزاً. لا يمكن استرجاعها إذا نسيتها، فاحفظها في مكان آمن.</p>
+        <div class="meter" id="su-meter"><i></i><i></i><i></i><i></i><span></span></div>
+        <label>تأكيد كلمة السر<input id="su-pass2" type="password" autocomplete="new-password" required></label>
+        <p class="muted small">10 أحرف على الأقل، وامزج حروفاً وأرقاماً ورموزاً.</p>
         <button class="btn primary big" type="submit">إنشاء الحساب والدخول</button>
+        <button class="btn link" type="button" data-show="login">عندي حساب</button>
       </form>
 
       <form id="lock-forgot" class="lock-form" hidden>
-        <p class="warn">كلمة السر لا تُحفظ في أي مكان، لذلك لا يمكن استرجاعها.</p>
-        <p>يمكنك إنشاء حساب جديد، لكن سيتم <b>فصل GitHub</b> (تحتاج تدخل الرمز من جديد) و<b>نسيان مجلد العمل</b> (تختاره من جديد). ملفات الفواتير نفسها لا تُحذف.</p>
-        <label>للتأكيد اكتب: مسح<input id="f-confirm" autocomplete="off"></label>
-        <button class="btn danger big" type="submit">مسح وإنشاء حساب جديد</button>
-        <button class="btn link" type="button" id="btn-forgot-back">رجوع</button>
+        <p>اكتب بريدك وسيرسل لك Firebase رابطاً لتعيين كلمة سر جديدة.</p>
+        <label>البريد الإلكتروني<input id="fp-email" type="email" dir="ltr" autocomplete="username" required></label>
+        <button class="btn primary big" type="submit">إرسال الرابط</button>
+        <button class="btn link" type="button" data-show="login">رجوع</button>
       </form>
 
       <p id="lock-msg" class="error" role="alert" hidden></p>
@@ -79,13 +91,10 @@
 
       <div class="gate-cloud" id="gate-cloud">
         <div class="or"><span>أو</span></div>
-        <div id="gate-cloud-ready" hidden>
-          <p>مستودع البيانات: <b id="gate-cloud-email" dir="ltr"></b></p>
-          <button class="btn big" id="btn-gate-cloud">فتح بياناتي من GitHub</button>
-          <p class="muted">بدون مجلد: البيانات تُقرأ وتُحفظ في مستودع GitHub مباشرة. يناسب الهاتف أو جهاز آخر.</p>
+        <div id="gate-cloud-ready">
+          <button class="btn big" id="btn-gate-cloud">☁ فتح بياناتي من Firebase بدون مجلد</button>
+          <p class="muted">البيانات تُقرأ وتُحفظ في Firebase مباشرة. يناسب الهاتف أو أي جهاز ثاني.</p>
         </div>
-        <button class="btn link" id="btn-gate-cloud-setup">الحفظ على GitHub بدون مجلد</button>
-        <div id="gate-cloud-form" class="cloud-form" hidden></div>
       </div>
 
       <p id="gate-error" class="error" hidden></p>
@@ -386,7 +395,7 @@
 
         <div class="card" id="security-card" style="max-width:1100px;margin-inline:auto">
           <h2>الأمان وتسجيل الدخول</h2>
-          <p class="muted">المستخدم: <b id="sec-user"></b>. كلمة السر لا تُحفظ، ورمز GitHub محفوظ مشفّراً بها (AES-256).</p>
+          <p class="muted">الحساب: <b id="sec-user" dir="ltr"></b>. الدخول يتحقق منه Firebase، وجلسة الدخول محفوظة على هذا الجهاز مشفّرة بكلمة السر (AES-256).</p>
           <div class="row actions">
             <label>قفل تلقائي بعد الخمول
               <select id="sec-idle"><option value="5">5 دقائق</option><option value="15">15 دقيقة</option><option value="30">30 دقيقة</option><option value="60">ساعة</option></select>
@@ -404,33 +413,46 @@
         <div class="card" id="cloud-card" style="max-width:1100px;margin-inline:auto">
           <div class="card-head">
             <div>
-              <h2>الحفظ على GitHub</h2>
-              <p class="muted">نسخة من كل شيء في مستودع GitHub خاص: بيانات الجهة، القالب المختار وألوانه، الترقيم، وكل الفواتير والوصولات (نفس ملفات المجلد). المجلد يبقى هو الأساس ويعمل بدون إنترنت، والرفع يصير تلقائياً عند توفر الاتصال.</p>
+              <h2>الحفظ على Firebase</h2>
+              <p class="muted">كل شيء يُحفظ في حسابك على Firebase: بيانات الجهة، القالب المختار وألوانه، الترقيم، وكل الفواتير والوصولات. الأجهزة تتزامن تلقائياً، والمجلد (إذا اخترته) يبقى نسخة احتياطية على الحاسبة تعمل بدون إنترنت.</p>
             </div>
             <span class="badge" id="cloud-badge">غير متصل</span>
           </div>
-          <div class="cloud-form" id="settings-cloud-form"></div>
-          <div class="row actions" id="cloud-actions" hidden>
-            <button class="btn primary" type="button" id="btn-cloud-upload">⬆ رفع كل البيانات الآن</button>
-            <button class="btn" type="button" id="btn-cloud-download">⬇ تنزيل من GitHub إلى المجلد</button>
-            <label class="check"><input type="checkbox" id="cloud-auto"> رفع تلقائي عند كل حفظ</label>
-            <button class="btn ghost danger" type="button" id="btn-cloud-signout">فصل GitHub</button>
+          <p id="cloud-info"></p>
+          <div class="row actions">
+            <button class="btn primary" type="button" id="btn-cloud-sync">⟳ مزامنة الآن</button>
+            <button class="btn" type="button" id="btn-cloud-upload">⬆ رفع كل بيانات المجلد</button>
+            <button class="btn" type="button" id="btn-cloud-download">⬇ نسخ كل بيانات Firebase إلى المجلد</button>
+            <button class="btn ghost danger" type="button" id="btn-logout">تسجيل الخروج من هذا الجهاز</button>
           </div>
+          <details class="cloud-help" id="gh-import">
+            <summary>نقل بياناتك من مستودع GitHub القديم</summary>
+            <p class="muted">إذا كنت تحفظ على مستودع GitHub سابقاً، أدخله مع الرمز مرة واحدة وتنتقل كل الملفات إلى Firebase.</p>
+            <div class="form-grid">
+              <label>المستودع<input id="gh-repo" dir="ltr" spellcheck="false" placeholder="kbs7s/invoice-data"></label>
+              <label>الرمز (Token)<input id="gh-token" type="password" dir="ltr" autocomplete="off" spellcheck="false" placeholder="github_pat_..."></label>
+            </div>
+            <div class="row"><button class="btn" type="button" id="btn-gh-import">نقل البيانات إلى Firebase</button></div>
+          </details>
           <details class="cloud-help">
-            <summary>طريقة التجهيز أول مرة (3 دقائق)</summary>
+            <summary>تجهيز Firebase أول مرة (5 دقائق)</summary>
             <ol>
-              <li>من GitHub أنشئ مستودعاً جديداً <b>خاصاً (Private)</b> للبيانات، مثلاً <code>invoice-data</code>. لا تستخدم مستودع البرنامج نفسه.</li>
-              <li>افتح <code>github.com/settings/personal-access-tokens/new</code> (Fine-grained token):
-                <ul>
-                  <li>Repository access: <b>Only select repositories</b> واختر مستودع البيانات فقط.</li>
-                  <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b>.</li>
-                  <li>Expiration: اختر مدة طويلة (سنة مثلاً).</li>
-                </ul>
-              </li>
-              <li>انسخ الرمز (يبدأ بـ <code>github_pat_</code>) والصقه هنا مع اسم المستودع بشكل <code>اسمك/invoice-data</code>، واضغط <b>ربط بـ GitHub</b>.</li>
-              <li>على أي جهاز ثاني أو الهاتف: نفس الرمز ونفس المستودع.</li>
+              <li>افتح <code>console.firebase.google.com</code> وأنشئ مشروعاً جديداً (مجاني، خطة Spark).</li>
+              <li><b>Authentication</b> ← Get started ← فعّل <b>Email/Password</b>.</li>
+              <li><b>Firestore Database</b> ← Create database ← اختر أقرب منطقة ← Production mode.</li>
+              <li>في Firestore ← <b>Rules</b> الصق هذه القواعد واضغط Publish:
+<pre dir="ltr">rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    match /users/{uid}/{doc=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid;
+    }
+  }
+}</pre></li>
+              <li>Project settings ← Your apps ← أضف <b>Web app</b> وانسخ <code>apiKey</code> و<code>projectId</code> للبرنامج.</li>
+              <li>بعد ما تنشئ حسابك من البرنامج: Authentication ← Settings ← User actions ← ألغِ <b>Enable create (sign-up)</b> حتى محد غيرك يقدر يسجّل.</li>
             </ol>
-            <p class="muted">الرمز يُحفظ في هذا المتصفح فقط ولا يُرفع لأي مكان. إذا ضاع الجهاز، احذف الرمز من نفس صفحة GitHub.</p>
           </details>
         </div>
       </section>
@@ -439,6 +461,7 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <script src="app/firebase-config.js"></script>
   <script src="app/auth.js"></script>
   <script src="app/storage.js"></script>
   <script src="app/store.js"></script>
