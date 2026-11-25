@@ -23,6 +23,7 @@
   let dirty = false;
   let wired = false;
   let catalog = {};
+  let allDocs = [];      // كل المستندات مع روابط التسديد (لقائمة الفواتير)
 
   function settings() { return App().settings; }
 
@@ -45,7 +46,7 @@
         customer: '', customerAddress: '', customerPhone: '', prevBalance: '', paymentMethod: mem.paymentMethod || 'نقداً', transactionType: '',
         items: type === 'sales' ? [blankItem(), blankItem(), blankItem()] : [],
         discount: '', paid: '', terms: mem.terms || '',
-        amount: '', purpose: '', notes: '', amountWords: '',
+        amount: '', purpose: '', notes: '', amountWords: '', invoiceNo: '',
         receiver: '', accountant: mem.accountant || '',
       },
     };
@@ -84,6 +85,7 @@
     $('#f-date').value = cur.date || today();
     for (const k of TEXT_FIELDS) { const el = $('#f-' + k); if (el) el.value = cur.data[k] == null ? '' : cur.data[k]; }
     $('#f-watermark').checked = cur.watermark !== false;
+    fillInvoiceSelect();
     $$('#issue-form [data-for]').forEach((el) => { el.hidden = el.dataset.for !== cur.type; });
     renderItems();
     updateHeader();
@@ -136,6 +138,71 @@
     cur.date = $('#f-date').value || today();
     cur.watermark = $('#f-watermark').checked;
     for (const k of TEXT_FIELDS) { const el = $('#f-' + k); if (el) cur.data[k] = el.value.trim(); }
+    if (cur.type === 'receipt') cur.data.invoiceNo = $('#f-invoice').value ? Number($('#f-invoice').value) : '';
+    else cur.data.invoiceNo = '';
+  }
+
+  // ---------- ربط وصل التسديد بفاتورة ----------
+  const sameName = (a, b) => String(a || '').trim() === String(b || '').trim();
+  /** المتبقي على الفاتورة بدون احتساب هذا الوصل نفسه (عند تعديل وصل محفوظ) */
+  function dueFor(inv) {
+    let due = App().money(inv).due;
+    if (cur._path && cur.type === 'receipt') {
+      const self = (inv._payments || []).find((x) => x._path === cur._path);
+      if (self && (self.currency || 'IQD') === (inv.currency || 'IQD')) {
+        const t = R.totals(inv);
+        due = Math.max(0, t.net - Math.min(t.paid, t.net) - (inv._linked - R.totals(self).total));
+      }
+    }
+    return due;
+  }
+  function invoiceOptions() {
+    const linked = Number(cur.data.invoiceNo) || 0;
+    return allDocs.filter((d) => d.type === 'sales' && (Number(d.number) === linked ||
+      (dueFor(d) > 0.0001 && (!cur.data.customer || sameName(d.data.customer, cur.data.customer)))));
+  }
+  function fillInvoiceSelect() {
+    const sel = $('#f-invoice');
+    if (!sel || cur.type !== 'receipt') return;
+    const linked = Number(cur.data.invoiceNo) || 0;
+    const opts = invoiceOptions();
+    sel.innerHTML = '<option value="">بدون ربط بفاتورة</option>' + opts.map((d) =>
+      `<option value="${Number(d.number)}">${esc(App().invLabel(d.number))} — ${esc(d.date)} — ${esc(d.data.customer || '')} — متبقي ${esc(R.money(dueFor(d), d.currency))}</option>`).join('') +
+      (linked && !opts.some((d) => Number(d.number) === linked) ? `<option value="${linked}">${esc(App().invLabel(linked))} (غير موجودة)</option>` : '');
+    sel.value = linked ? String(linked) : '';
+    invoiceHint();
+  }
+  function invoiceHint() {
+    const el = $('#f-invoice-hint');
+    const no = Number($('#f-invoice').value) || 0;
+    const inv = no && allDocs.find((d) => d.type === 'sales' && Number(d.number) === no);
+    if (!inv) { el.textContent = ''; return; }
+    const due = dueFor(inv);
+    const amt = R.totals(cur).total;
+    const after = Math.max(0, due - amt);
+    el.innerHTML = `المتبقي على الفاتورة: <b>${esc(R.money(due, inv.currency))}</b>` +
+      (amt > 0 ? ` — بعد هذا الوصل: <b class="${after > 0.0001 ? 'red' : 'green'}">${after > 0.0001 ? esc(R.money(after, inv.currency)) : 'تُسدَّد بالكامل'}</b>` : '') +
+      (amt - due > 0.0001 ? ' <span class="red">(المبلغ أكبر من المتبقي)</span>' : '') +
+      ((inv.currency || 'IQD') !== (cur.currency || 'IQD') ? ' <span class="red">(عملة الفاتورة مختلفة)</span>' : '');
+  }
+  function onInvoicePick() {
+    const prevNo = Number(cur.data.invoiceNo) || 0;
+    const prevInv = prevNo && allDocs.find((d) => d.type === 'sales' && Number(d.number) === prevNo);
+    const prevAuto = prevInv ? { amount: String(Math.round(dueFor(prevInv) * 100) / 100), purpose: `تسديد فاتورة رقم ${App().invLabel(prevNo)}` } : { amount: '', purpose: '' };
+    const no = Number($('#f-invoice').value) || 0;
+    cur.data.invoiceNo = no || '';
+    const inv = no && allDocs.find((d) => d.type === 'sales' && Number(d.number) === no);
+    if (inv) {
+      const set = (k, v, auto) => { const el = $('#f-' + k); if (!el.value.trim() || el.value.trim() === auto) { el.value = v; cur.data[k] = v; } };
+      set('customer', inv.data.customer || '', '');
+      set('amount', String(Math.round(dueFor(inv) * 100) / 100), prevAuto.amount);
+      set('purpose', `تسديد فاتورة رقم ${App().invLabel(no)}`, prevAuto.purpose);
+      set('transactionType', 'تسديد', '');
+      if ((inv.currency || 'IQD') !== cur.currency) { cur.currency = inv.currency || 'IQD'; $('#f-currency').value = cur.currency; }
+    }
+    readForm();
+    invoiceHint();
+    markDirty();
   }
 
   let raf = 0;
@@ -153,7 +220,7 @@
            <div><span>بعد الخصم</span><b>${R.money(t.net, cur.currency)}</b></div>
            ${t.prevBalance ? `<div><span>مع السابق</span><b>${R.money(t.grand, cur.currency)}</b></div>` : ''}
            <div><span>الواصل</span><b class="green">${R.money(t.paid, cur.currency)}</b></div>
-           <div><span>المتبقي</span><b class="${t.remaining > 0 ? 'red' : ''}">${R.money(t.remaining, cur.currency)}</b></div>`
+           <div><span>المتبقي</span><b class="${t.remaining > 0 ? 'red' : ''}">${R.money(t.remaining, cur.currency)}</b></div>${linkedBox(t)}`
         : `<div><span>المبلغ</span><b>${R.money(t.total, cur.currency)}</b></div>`;
       // نعرض الرقم التالي في المعاينة إذا كان المستند جديداً
       const shown = { ...cur, number: cur.number || Number(($('#f-number').placeholder.match(/\d+/) || [0])[0]) || '' };
@@ -161,6 +228,16 @@
       $('#issue-preview').innerHTML = r.html;
       updateHeader();
     });
+  }
+
+  /** للفاتورة المحفوظة: وصولات التسديد المرتبطة بها والمتبقي الفعلي */
+  function linkedBox(t) {
+    if (!cur._path || cur.type !== 'sales') return '';
+    const inv = allDocs.find((d) => d.type === 'sales' && Number(d.number) === Number(cur.number));
+    if (!inv || !inv._payments || !inv._payments.length) return '';
+    const left = Math.max(0, t.net - Math.min(t.paid, t.net) - inv._linked);
+    return `<div><span>مسدد بـ ${inv._payments.length} وصل</span><b class="green">${R.money(inv._linked, cur.currency)}</b></div>
+            <div><span>المتبقي الفعلي</span><b class="${left > 0.0001 ? 'red' : 'green'}">${R.money(left, cur.currency)}</b></div>`;
   }
 
   function markDirty() { dirty = true; refresh(); }
@@ -182,6 +259,7 @@
     out.data.items = (out.data.items || []).filter((it) => it.name || it.qty || it.price)
       .map((it) => ({ ...it, qty: toNum(it.qty), price: toNum(it.price), pack: toNum(it.pack) }));
     for (const k of ['discount', 'paid', 'prevBalance', 'amount']) out.data[k] = toNum(out.data[k]);
+    if (!(out.type === 'receipt' && out.data.invoiceNo)) out.data.invoiceNo = undefined;
     out.data.total = R.totals(out).total;
     if (cur._path) out._path = cur._path;
     const saved = await St.saveDocument(out);
@@ -211,7 +289,10 @@
   // ---------- أسماء العملاء من الأرشيف ----------
   async function loadCustomers() {
     try {
-      const docs = await St.listDocuments();
+      const docs = await App().loadAll();
+      allDocs = docs;
+      fillInvoiceSelect();
+      refresh();
       const names = [...new Set(docs.map((d) => d.data && d.data.customer).filter(Boolean))];
       $('#customers-list').innerHTML = names.map((n) => `<option value="${esc(n)}">`).join('');
       // قائمة المواد المستخدمة سابقاً: اختيار اسم مادة يعبّي السعر والوحدة والوصف من آخر استخدام
@@ -240,12 +321,16 @@
             }
           }
         }
-      } else if (e.target.id !== 'f-type') {
+      } else if (e.target.id !== 'f-type' && e.target.id !== 'f-invoice') {
         readForm();
+        if (cur.type === 'receipt' && (e.target.id === 'f-amount' || e.target.id === 'f-currency')) invoiceHint();
       }
+      if (e.target.id === 'f-invoice') return;
       markDirty();
     });
     form.addEventListener('change', async (e) => {
+      if (e.target.id === 'f-invoice') return onInvoicePick();
+      if (e.target.id === 'f-customer' && cur.type === 'receipt') { readForm(); fillInvoiceSelect(); return; }
       if (e.target.id === 'f-type') {
         cur = newDoc(e.target.value); dirty = false; await fillForm();
       } else if (e.target.id === 'f-template') {

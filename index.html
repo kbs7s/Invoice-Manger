@@ -109,6 +109,7 @@
         <button data-tab="dashboard" class="active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>لوحة التحكم</button>
         <button data-tab="issue"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>إصدار مستند</button>
         <button data-tab="archive"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>الأرشيف</button>
+        <button data-tab="payments"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>التسديدات</button>
         <button data-tab="customers"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>العملاء</button>
         <button data-tab="templates"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>القوالب</button>
         <button data-tab="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>الإعدادات</button>
@@ -236,6 +237,10 @@
             <!-- وصل قبض -->
             <div data-for="receipt">
               <div class="form-grid two">
+                <label class="span2">عن فاتورة (تسديد)
+                  <select id="f-invoice"><option value="">بدون ربط بفاتورة</option></select>
+                  <small class="muted" id="f-invoice-hint"></small>
+                </label>
                 <label>المبلغ<input id="f-amount" inputmode="decimal" dir="ltr"></label>
                 <label>وذلك عن<input id="f-purpose"></label>
                 <label class="span2">الملاحظات<input id="f-notes"></label>
@@ -294,6 +299,43 @@
           </table>
           </div>
           <p class="muted empty" id="archive-empty" hidden>لا توجد مستندات محفوظة بعد.</p>
+        </div>
+      </section>
+
+      <!-- أرشيف التسديدات -->
+      <section class="panel" data-panel="payments" hidden>
+        <div class="card">
+          <div class="card-head">
+            <div><h2>أرشيف التسديدات</h2><p class="muted">كل وصولات القبض، وكل وصل مربوط بالفاتورة اللي سددها</p></div>
+            <div class="row">
+              <label class="search"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="pay-search" type="search" placeholder="بحث بالاسم أو رقم الوصل أو الفاتورة..."></label>
+              <select id="pay-link">
+                <option value="">كل الوصولات</option>
+                <option value="linked">مرتبطة بفاتورة</option>
+                <option value="free">بدون فاتورة</option>
+              </select>
+            </div>
+          </div>
+          <div class="pay-filter" id="pay-filter" hidden>
+            <span id="pay-filter-text"></span>
+            <span class="row">
+              <button class="btn small primary" id="btn-pay-filter-add">💵 وصل تسديد جديد لهذه الفاتورة</button>
+              <button class="btn small ghost" id="btn-pay-filter-clear">عرض كل التسديدات ✕</button>
+            </span>
+          </div>
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>رقم الوصل</th><th>التاريخ</th><th>العميل</th><th>المبلغ</th><th>عن فاتورة</th><th>متبقي الفاتورة</th><th></th></tr></thead>
+            <tbody id="pay-body"></tbody>
+            <tfoot id="pay-foot"></tfoot>
+          </table>
+          </div>
+          <p class="muted empty" id="pay-empty" hidden>لا توجد وصولات تسديد بعد.</p>
+        </div>
+        <div class="card">
+          <h2 style="font-size:16px">فواتير عليها مبالغ متبقية</h2>
+          <ul class="top-list" id="pay-open"></ul>
+          <p class="muted empty" id="pay-open-empty" hidden>كل الفواتير مسددة بالكامل 👌</p>
         </div>
       </section>
 

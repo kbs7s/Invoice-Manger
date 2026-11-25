@@ -123,6 +123,7 @@
     dashboard: renderDashboard,
     issue: () => window.Issue.render(),
     archive: renderArchive,
+    payments: renderPayments,
     customers: renderCustomers,
     templates: renderTemplates,
     settings: renderSettings,
@@ -139,9 +140,35 @@
   function money(d) {
     const t = Render.totals(d);
     if (d.type === 'receipt') return { total: t.total, paid: t.total, due: 0, status: 'receipt' };
-    const due = Math.max(0, t.net - t.paid);
-    return { total: t.net, paid: Math.min(t.paid, t.net), due, status: due <= 0.0001 ? 'paid' : (t.paid > 0 ? 'partial' : 'due') };
+    // paid = الواصل المكتوب بالفاتورة فقط (حتى لا تُجمع الوصولات مرتين)، linked = وصولات التسديد المرتبطة بها
+    const own = Math.min(t.paid, t.net);
+    const linked = d._linked || 0;
+    const due = Math.max(0, t.net - own - linked);
+    return { total: t.net, paid: own, linked, due, status: due <= 0.0001 ? 'paid' : (own + linked > 0 ? 'partial' : 'due') };
   }
+
+  // ----- ربط وصولات التسديد بالفواتير -----
+  /** يربط كل وصل فيه data.invoiceNo بفاتورته: inv._linked (المجموع) و inv._payments و receipt._invoice */
+  function linkPayments(docs) {
+    // خصائص غير قابلة للتعداد: لا تُحفظ مع المستند ولا تسبب حلقة عند نسخه
+    const hide = (o, k, v) => Object.defineProperty(o, k, { value: v, writable: true, configurable: true, enumerable: false });
+    const inv = new Map();
+    for (const d of docs) { if (d.type === 'sales') { hide(d, '_linked', 0); hide(d, '_payments', []); inv.set(Number(d.number), d); } }
+    for (const d of docs) {
+      if (d.type !== 'receipt') continue;
+      hide(d, '_invoice', null);
+      const no = Number(d.data && d.data.invoiceNo);
+      if (!no) continue;
+      const i = inv.get(no);
+      if (!i) { d._invoice = { missing: true, number: no }; continue; }
+      d._invoice = i;
+      i._payments.push(d);
+      if ((i.currency || 'IQD') === (d.currency || 'IQD')) i._linked += Render.totals(d).total;
+    }
+    return docs;
+  }
+  async function loadAll() { return linkPayments(await St.listDocuments()); }
+  const invLabel = (no) => formatNumber('sales', no, settings);
   const STATUS = {
     paid: '<span class="badge success">مدفوعة</span>',
     partial: '<span class="badge warning">دفعة جزئية</span>',
@@ -158,6 +185,19 @@
     return { main: formatMoney(map[first], first), rest: keys.filter((k) => k !== first).map((k) => '+ ' + formatMoney(map[k], k)).join('  ') };
   }
 
+  function linkNote(d) {
+    if (d.type === 'receipt' && d._invoice) {
+      return d._invoice.missing
+        ? `<div class="link-note muted">عن فاتورة ${esc(invLabel(d._invoice.number))} (محذوفة)</div>`
+        : `<div class="link-note"><button class="linkish" data-act="open-invoice">عن فاتورة ${esc(invLabel(d._invoice.number))}</button></div>`;
+    }
+    if (d.type === 'sales' && d._payments && d._payments.length) {
+      return `<div class="link-note"><button class="linkish" data-act="payments">${d._payments.length} وصل تسديد</button></div>`;
+    }
+    return '';
+  }
+  const payBtn = (d) => (d.type === 'sales' && money(d).due > 0.0001 ? '<button class="btn small" data-act="pay" title="إنشاء وصل تسديد لهذه الفاتورة">💵 تسديد</button>' : '');
+
   function docRow(d, actions) {
     const m = money(d);
     return `
@@ -165,7 +205,7 @@
         <td class="num strong">${esc(formatNumber(d.type, d.number, settings))}</td>
         <td>${typeBadge(d.type)}</td>
         <td class="num">${esc(d.date)}</td>
-        <td class="strong">${esc(d.data && d.data.customer)}</td>
+        <td class="strong">${esc(d.data && d.data.customer)}${linkNote(d)}</td>
         <td class="money">${esc(formatMoney(m.total, d.currency))}${m.due > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:500">متبقي ${esc(formatMoney(m.due, d.currency))}</div>` : ''}</td>
         <td>${STATUS[m.status]}</td>
         <td class="acts">${actions}</td>
@@ -181,7 +221,7 @@
     return period === 'year' ? String(d.date || '').startsWith(String(now.getFullYear())) : String(d.date || '').startsWith(ym);
   }
   async function renderDashboard() {
-    dashDocs = await St.listDocuments();
+    dashDocs = await loadAll();
     const period = $('#dash-period').value;
     const main = settings.defaults.currency || 'IQD';
     const docs = dashDocs.filter((d) => inPeriod(d, period));
@@ -219,7 +259,7 @@
 
     const recent = dashDocs.slice(0, 7);
     $('#dash-recent').innerHTML = recent.map((d) => docRow(d,
-      '<button class="btn small ghost" data-act="open" title="فتح للتعديل">✏️</button><button class="btn small ghost" data-act="print" title="طباعة">🖨️</button>')).join('');
+      payBtn(d) + '<button class="btn small ghost" data-act="open" title="فتح للتعديل">✏️</button><button class="btn small ghost" data-act="print" title="طباعة">🖨️</button>')).join('');
     $('#dash-empty').hidden = recent.length > 0;
 
     const top = debtors.sort((a, b) => b.balance - a.balance).slice(0, 5);
@@ -251,7 +291,7 @@
 
   let custList = [];
   async function renderCustomers(reload = true) {
-    if (reload) custList = customerBalances(await St.listDocuments());
+    if (reload) custList = customerBalances(await loadAll());
     const q = $('#cust-search').value.trim().toLowerCase();
     const sort = $('#cust-sort').value;
     const rows = custList.filter((c) => !q || (c.name + ' ' + c.phone).toLowerCase().includes(q));
@@ -297,16 +337,18 @@
       sel.innerHTML = '<option value="">كل الأنواع</option>' +
         Object.entries(St.DOC_TYPES).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
     }
-    if (reload) archiveDocs = await St.listDocuments(sel.value || undefined);
+    if (reload) archiveDocs = await loadAll();
     const q = $('#archive-search').value.trim().toLowerCase();
     const status = $('#archive-status').value;
+    const type = sel.value;
     const rows = archiveDocs.filter((d) => {
+      if (type && d.type !== type) return false;
       if (status && money(d).status !== status) return false;
       if (!q) return true;
       const hay = [formatNumber(d.type, d.number, settings), d.number, d.data && d.data.customer, d.data && d.data.customerPhone, d.date].join(' ').toLowerCase();
       return hay.includes(q);
     });
-    $('#archive-body').innerHTML = rows.map((d) => docRow(d, `
+    $('#archive-body').innerHTML = rows.map((d) => docRow(d, `${payBtn(d)}
           <button class="btn small ghost" data-act="open">فتح</button>
           <button class="btn small ghost" data-act="print">طباعة</button>
           <button class="btn small ghost" data-act="copy">تكرار</button>
@@ -324,8 +366,14 @@
   }
 
   async function archiveAction(act, path) {
-    const doc = archiveDocs.find((d) => d._path === path) || dashDocs.find((d) => d._path === path);
+    const doc = archiveDocs.find((d) => d._path === path) || dashDocs.find((d) => d._path === path) || payDocs.find((d) => d._path === path);
     if (!doc) return;
+    if (act === 'pay') return payInvoice(doc);
+    if (act === 'payments') { payFilter = Number(doc.number); return switchTab('payments'); }
+    if (act === 'open-invoice') {
+      if (doc._invoice && !doc._invoice.missing && await window.Issue.open(doc._invoice, false)) switchTab('issue');
+      return;
+    }
     if (act === 'open' || act === 'copy') {
       if (await window.Issue.open(doc, act === 'copy')) switchTab('issue');
     } else if (act === 'print') {
@@ -334,11 +382,82 @@
       Render.print(Render.renderPages(doc, tpl, settings, { watermark: doc.watermark }));
     } else if (act === 'delete') {
       const label = formatNumber(doc.type, doc.number, settings);
-      if (!confirm(`حذف المستند ${label} نهائياً من المجلد؟`)) return;
+      const n = (doc._payments || []).length;
+      if (!confirm(`حذف المستند ${label} نهائياً؟` + (n ? `\nمرتبط بها ${n} وصل تسديد، تبقى الوصولات لكن بدون فاتورة.` : ''))) return;
       await St.deleteDocument(path);
       toast('تم حذف ' + label);
       switchTab(currentTab);
     }
+  }
+
+  // ----- أرشيف التسديدات -----
+  let payDocs = [];
+  let payFilter = 0; // رقم فاتورة لعرض تسديداتها فقط
+  /** وصل تسديد جديد مرتبط بفاتورة، بالمبلغ المتبقي عليها */
+  async function payInvoice(inv) {
+    const m = money(inv);
+    const label = invLabel(inv.number);
+    const prefill = {
+      customer: inv.data.customer || '', customerPhone: inv.data.customerPhone || '', customerAddress: inv.data.customerAddress || '',
+      amount: String(Math.round(m.due * 100) / 100), invoiceNo: Number(inv.number),
+      purpose: `تسديد فاتورة رقم ${label}`, transactionType: 'تسديد',
+    };
+    if (await window.Issue.startNew('receipt', prefill, inv.currency)) switchTab('issue');
+  }
+  async function renderPayments(reload = true) {
+    if (reload) payDocs = await loadAll();
+    const q = $('#pay-search').value.trim().toLowerCase();
+    const link = $('#pay-link').value;
+    const inv = payFilter ? payDocs.find((d) => d.type === 'sales' && Number(d.number) === payFilter) : null;
+    $('#pay-filter').hidden = !payFilter;
+    if (payFilter) {
+      const m = inv ? money(inv) : null;
+      $('#pay-filter-text').innerHTML = inv
+        ? `تسديدات الفاتورة <b>${esc(invLabel(payFilter))}</b> — ${esc(inv.data.customer || '')}: الإجمالي ${esc(formatMoney(m.total, inv.currency))}، الواصل بالفاتورة ${esc(formatMoney(m.paid, inv.currency))}، المسدد بالوصولات ${esc(formatMoney(m.linked, inv.currency))}، <b class="${m.due > 0.0001 ? 'red' : 'green'}">المتبقي ${esc(formatMoney(m.due, inv.currency))}</b>`
+        : `تسديدات الفاتورة <b>${esc(invLabel(payFilter))}</b> (الفاتورة محذوفة)`;
+      $('#btn-pay-filter-add').hidden = !(inv && m.due > 0.0001);
+    }
+    const rows = payDocs.filter((d) => {
+      if (d.type !== 'receipt') return false;
+      if (payFilter) return Number(d.data.invoiceNo) === payFilter;
+      if (link === 'linked' && !d._invoice) return false;
+      if (link === 'free' && d._invoice) return false;
+      if (!q) return true;
+      const hay = [formatNumber(d.type, d.number, settings), d.data.customer, d.date, d.data.purpose, d._invoice ? invLabel(d._invoice.number) : ''].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    $('#pay-body').innerHTML = rows.map((d) => {
+      const i = d._invoice;
+      const invCell = !i ? '<span class="muted">بدون فاتورة</span>'
+        : i.missing ? `<span class="muted">${esc(invLabel(i.number))} (محذوفة)</span>`
+        : `<button class="linkish strong" data-act="open-invoice">${esc(invLabel(i.number))}</button>`;
+      const left = i && !i.missing ? money(i) : null;
+      return `
+      <tr data-path="${esc(d._path)}">
+        <td class="num strong">${esc(formatNumber(d.type, d.number, settings))}</td>
+        <td class="num">${esc(d.date)}</td>
+        <td class="strong">${esc(d.data.customer)}<div class="link-note muted">${esc(d.data.purpose || '')}</div></td>
+        <td class="money">${esc(formatMoney(Render.totals(d).total, d.currency))}</td>
+        <td>${invCell}</td>
+        <td class="money">${left ? (left.due > 0.0001 ? `<span class="red">${esc(formatMoney(left.due, i.currency))}</span>` : '<span class="badge success">مسددة بالكامل</span>') : '—'}</td>
+        <td class="acts">
+          <button class="btn small ghost" data-act="open">فتح</button>
+          <button class="btn small ghost" data-act="print">طباعة</button>
+          <button class="btn small ghost danger" data-act="delete">حذف</button>
+        </td>
+      </tr>`;
+    }).join('');
+    const sums = {};
+    for (const d of rows) addTo(sums, d.currency, Render.totals(d).total);
+    const T = sumText(sums, settings.defaults.currency || 'IQD');
+    $('#pay-foot').innerHTML = rows.length ? `<tr><td colspan="7" class="muted">${rows.length} وصل تسديد — المجموع <b dir="ltr">${esc(T.main)}</b> ${esc(T.rest)}</td></tr>` : '';
+    $('#pay-empty').hidden = rows.length > 0;
+    // الفواتير المفتوحة (عليها متبقي) لإنشاء وصل تسديد بسرعة
+    const open = payDocs.filter((d) => d.type === 'sales' && money(d).due > 0.0001);
+    $('#pay-open').innerHTML = open.slice(0, 12).map((d) => `
+      <li data-path="${esc(d._path)}"><span><b>${esc(invLabel(d.number))}</b> · ${esc(d.data.customer || '')}</span>
+      <span class="row"><b class="red">${esc(formatMoney(money(d).due, d.currency))}</b><button class="btn small" data-act="pay">💵 تسديد</button></span></li>`).join('');
+    $('#pay-open-empty').hidden = open.length > 0;
   }
 
   // ----- القوالب والمعاينة -----
@@ -540,7 +659,7 @@
   $('#dash-period').addEventListener('change', () => renderDashboard().catch((e) => toast(e.message, true)));
   $('#dash-recent').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) archiveAction(b.dataset.act, b.closest('tr').dataset.path).catch((err) => toast(err.message, true));
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
   });
   $('#cust-search').addEventListener('input', () => renderCustomers(false));
   $('#cust-sort').addEventListener('change', () => renderCustomers(false));
@@ -563,13 +682,22 @@
   }
   applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
   $('#btn-theme').addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
-  $('#archive-type').addEventListener('change', () => renderArchive(true));
+  $('#archive-type').addEventListener('change', () => renderArchive(false));
   $('#archive-search').addEventListener('input', () => renderArchive(false));
   $('#archive-body').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) archiveAction(b.dataset.act, b.closest('tr').dataset.path).catch((err) => toast(err.message, true));
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
   });
   $('#btn-archive-refresh').addEventListener('click', () => renderArchive(true));
+  $('#pay-search').addEventListener('input', () => renderPayments(false));
+  $('#pay-link').addEventListener('change', () => renderPayments(false));
+  $('#btn-pay-filter-clear').addEventListener('click', () => { payFilter = 0; renderPayments(false); });
+  $('#btn-pay-filter-add').addEventListener('click', () => { const inv = payDocs.find((d) => d.type === 'sales' && Number(d.number) === payFilter); if (inv) payInvoice(inv); });
+  $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab="payments"]'); if (b) payFilter = 0; }, true);
+  ['#pay-body', '#pay-open'].forEach((sel) => $(sel).addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
+  }));
   $('#tpl-import').addEventListener('change', async (e) => {
     const f = e.target.files[0];
     e.target.value = '';
@@ -617,7 +745,7 @@
 
   // للاختبار: تشغيل البرنامج على مجلد جاهز
   window.App = {
-    openApp, toast, formatNumber, formatMoney, switchTab, pv,
+    openApp, loadAll, money, invLabel, toast, formatNumber, formatMoney, switchTab, pv,
     get settings() { return settings; },
     set settings(v) { settings = v; },
   };
