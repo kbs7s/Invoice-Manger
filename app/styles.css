@@ -114,7 +114,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 24px 20px 60px; }
 .panel { animation: fade .18s ease-out; }
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-@media (max-width: 1100px) {
+@media (max-width: 1480px) {
   .topbar { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 10px; }
   .tabs { order: 3; width: 100%; margin: 0; }
   .top-actions { margin-inline-start: auto; }
@@ -334,3 +334,10 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); 
 .lock-form .btn.link.small { font-size: 12px; justify-self: center; color: var(--dim); }
 #lock-msg.ok { color: var(--success); }
 .cloud-help pre { background: var(--surface-2, var(--bg)); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 12px; overflow-x: auto; text-align: left; }
+
+/* ---------- التسديدات ---------- */
+.linkish { background: none; border: 0; padding: 0; font: inherit; color: var(--primary); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.link-note { font-size: 11.5px; font-weight: 500; margin-top: 2px; }
+.pay-filter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--primary-soft); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 13.5px; }
+.top-list li .row { align-items: center; gap: 8px; flex-wrap: nowrap; }
+#f-invoice-hint { font-weight: 500; }
