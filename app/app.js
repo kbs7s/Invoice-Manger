@@ -127,6 +127,7 @@
     customers: renderCustomers,
     templates: renderTemplates,
     settings: renderSettings,
+    audit: renderAudit,
   };
   function switchTab(tab) {
     currentTab = tab;
@@ -137,14 +138,29 @@
 
   // ----- الحالة المالية -----
   /** الحالة المالية للمستند: للفاتورة المتبقي = الصافي − الواصل (بدون الرصيد السابق حتى لا يُحسب مرتين) */
+  const todayStr = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const isCancelled = (d) => d && d.status === 'cancelled';
   function money(d) {
+    // المستند الملغى يبقى بالأرشيف لكن لا يدخل بأي حساب
+    if (isCancelled(d)) return { total: 0, paid: 0, linked: 0, due: 0, status: 'cancelled' };
     const t = Render.totals(d);
-    if (d.type === 'receipt') return { total: t.total, paid: t.total, due: 0, status: 'receipt' };
+    if (d.type === 'receipt') return { total: t.total, paid: t.total, due: 0, status: 'receipt', unallocated: d._unallocated || 0 };
     // paid = الواصل المكتوب بالفاتورة فقط (حتى لا تُجمع الوصولات مرتين)، linked = وصولات التسديد المرتبطة بها
-    const own = Math.min(t.paid, t.net);
+    const own = Math.max(0, Math.min(t.paid, t.net));
     const linked = d._linked || 0;
-    const due = Math.max(0, t.net - own - linked);
-    return { total: t.net, paid: own, linked, due, status: due <= 0.0001 ? 'paid' : (own + linked > 0 ? 'partial' : 'due') };
+    const due = Math.max(0, Render.add(t.net, -own, -linked));
+    const overdue = due > 0.0001 && d.data && d.data.dueDate && d.data.dueDate < todayStr();
+    return { total: t.net, paid: own, linked, due, status: due <= 0.0001 ? 'paid' : overdue ? 'overdue' : (own + linked > 0 ? 'partial' : 'due') };
+  }
+
+  /** توزيع الوصل على الفواتير: data.allocations، أو الربط القديم data.invoiceNo بكامل المبلغ */
+  function allocsOf(r) {
+    const d = r.data || {};
+    if (Array.isArray(d.allocations) && d.allocations.length) {
+      return d.allocations.map((a) => ({ invoiceNo: Number(a.invoiceNo), amount: Render.num(a.amount) })).filter((a) => a.invoiceNo && a.amount > 0);
+    }
+    const no = Number(d.invoiceNo);
+    return no ? [{ invoiceNo: no, amount: Render.totals(r).total }] : [];
   }
 
   // ----- ربط وصولات التسديد بالفواتير -----
@@ -153,17 +169,32 @@
     // خصائص غير قابلة للتعداد: لا تُحفظ مع المستند ولا تسبب حلقة عند نسخه
     const hide = (o, k, v) => Object.defineProperty(o, k, { value: v, writable: true, configurable: true, enumerable: false });
     const inv = new Map();
-    for (const d of docs) { if (d.type === 'sales') { hide(d, '_linked', 0); hide(d, '_payments', []); inv.set(Number(d.number), d); } }
-    for (const d of docs) {
-      if (d.type !== 'receipt') continue;
-      hide(d, '_invoice', null);
-      const no = Number(d.data && d.data.invoiceNo);
-      if (!no) continue;
-      const i = inv.get(no);
-      if (!i) { d._invoice = { missing: true, number: no }; continue; }
-      d._invoice = i;
-      i._payments.push(d);
-      if ((i.currency || 'IQD') === (d.currency || 'IQD')) i._linked += Render.totals(d).total;
+    for (const d of docs) { if (d.type === 'sales') { hide(d, '_linked', 0); hide(d, '_payments', []); hide(d, '_alloc', new Map()); inv.set(Number(d.number), d); } }
+    // من الأقدم للأحدث: الوصل الأقدم يأخذ أولوية التسديد
+    const receipts = docs.filter((d) => d.type === 'receipt').sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.number - b.number));
+    for (const d of receipts) {
+      hide(d, '_invoice', null); hide(d, '_invoices', []); hide(d, '_unallocated', 0); hide(d, '_over', 0);
+      if (isCancelled(d)) continue;
+      const total = Render.totals(d).total;
+      let used = 0;
+      for (const a of allocsOf(d)) {
+        const i = inv.get(a.invoiceNo);
+        if (!i || isCancelled(i)) { d._invoices.push({ missing: true, number: a.invoiceNo, amount: a.amount }); continue; }
+        if ((i.currency || 'IQD') !== (d.currency || 'IQD')) { d._invoices.push({ inv: i, amount: 0, currencyMismatch: true }); if (!i._payments.includes(d)) i._payments.push(d); continue; }
+        // لا يُحتسب أكثر من المتبقي على الفاتورة ولا أكثر من مبلغ الوصل (لا تسديد مكرر)
+        const t = Render.totals(i);
+        const room = Math.max(0, Render.add(t.net, -Math.max(0, Math.min(t.paid, t.net)), -i._linked));
+        const take = Math.max(0, Math.min(a.amount, room, Render.add(total, -used)));
+        if (take < a.amount) d._over = Render.add(d._over, a.amount - take);
+        i._linked = Render.add(i._linked, take);
+        i._alloc.set(d, Render.add(i._alloc.get(d) || 0, take));
+        used = Render.add(used, take);
+        if (!i._payments.includes(d)) i._payments.push(d);
+        d._invoices.push({ inv: i, amount: take });
+      }
+      d._unallocated = Math.max(0, Render.add(total, -used)); // رصيد للزبون (دفعة مقدمة / زيادة)
+      const first = d._invoices[0];
+      d._invoice = first ? (first.missing ? { missing: true, number: first.number } : first.inv) : null;
     }
     return docs;
   }
@@ -173,7 +204,9 @@
     paid: '<span class="badge success">مدفوعة</span>',
     partial: '<span class="badge warning">دفعة جزئية</span>',
     due: '<span class="badge danger">آجل</span>',
+    overdue: '<span class="badge danger">متأخرة ⚠</span>',
     receipt: '<span class="badge primary">مقبوض</span>',
+    cancelled: '<span class="badge muted-badge">ملغى</span>',
   };
   const typeBadge = (t) => `<span class="badge ${t === 'sales' ? '' : 'primary'}">${esc((St.DOC_TYPES[t] || {}).label || t)}</span>`;
   /** يجمع مبالغ بعملات مختلفة: { IQD: 1000, USD: 5 } */
@@ -186,14 +219,17 @@
   }
 
   function linkNote(d) {
-    if (d.type === 'receipt' && d._invoice) {
-      return d._invoice.missing
-        ? `<div class="link-note muted">عن فاتورة ${esc(invLabel(d._invoice.number))} (محذوفة)</div>`
-        : `<div class="link-note"><button class="linkish" data-act="open-invoice">عن فاتورة ${esc(invLabel(d._invoice.number))}</button></div>`;
+    if (isCancelled(d)) return `<div class="link-note muted">ملغى${d.cancelReason ? ': ' + esc(d.cancelReason) : ''}</div>`;
+    if (d.type === 'receipt' && d._invoices && d._invoices.length) {
+      const parts = d._invoices.map((x) => x.missing
+        ? `<span class="muted">${esc(invLabel(x.number))} (محذوفة أو ملغاة)</span>`
+        : `<button class="linkish" data-act="open-invoice" data-no="${Number(x.inv.number)}">${esc(invLabel(x.inv.number))}</button>`);
+      return `<div class="link-note">عن فاتورة ${parts.join('، ')}${d._unallocated > 0.0001 ? ` <span class="muted">· غير موزّع ${esc(formatMoney(d._unallocated, d.currency))}</span>` : ''}</div>`;
     }
     if (d.type === 'sales' && d._payments && d._payments.length) {
       return `<div class="link-note"><button class="linkish" data-act="payments">${d._payments.length} وصل تسديد</button></div>`;
     }
+    if (d.type === 'sales' && d.data && d.data.dueDate && money(d).due > 0.0001) return `<div class="link-note muted">تستحق ${esc(d.data.dueDate)}</div>`;
     return '';
   }
   const payBtn = (d) => (d.type === 'sales' && money(d).due > 0.0001 ? '<button class="btn small" data-act="pay" title="إنشاء وصل تسديد لهذه الفاتورة">💵 تسديد</button>' : '');
@@ -201,12 +237,12 @@
   function docRow(d, actions) {
     const m = money(d);
     return `
-      <tr data-path="${esc(d._path)}">
+      <tr data-path="${esc(d._path)}" class="${isCancelled(d) ? 'cancelled' : ''}">
         <td class="num strong">${esc(formatNumber(d.type, d.number, settings))}</td>
         <td>${typeBadge(d.type)}</td>
         <td class="num">${esc(d.date)}</td>
         <td class="strong">${esc(d.data && d.data.customer)}${linkNote(d)}</td>
-        <td class="money">${esc(formatMoney(m.total, d.currency))}${m.due > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:500">متبقي ${esc(formatMoney(m.due, d.currency))}</div>` : ''}</td>
+        <td class="money">${esc(formatMoney(isCancelled(d) ? Render.totals(d).total : m.total, d.currency))}${m.due > 0 ? `<div class="muted" style="font-size:11.5px;font-weight:500">متبقي ${esc(formatMoney(m.due, d.currency))}</div>` : ''}</td>
         <td>${STATUS[m.status]}</td>
         <td class="acts">${actions}</td>
       </tr>`;
@@ -273,7 +309,7 @@
     const map = new Map();
     for (const d of docs.slice().reverse()) { // من الأقدم للأحدث حتى تبقى آخر بيانات اتصال
       const name = ((d.data && d.data.customer) || '').trim();
-      if (!name) continue;
+      if (!name || isCancelled(d)) continue;
       const key = name + '|' + (d.currency || 'IQD');
       let c = map.get(key);
       if (!c) { c = { name, currency: d.currency || 'IQD', phone: '', address: '', count: 0, total: 0, paid: 0, balance: 0, last: '' }; map.set(key, c); }
@@ -343,15 +379,16 @@
     const type = sel.value;
     const rows = archiveDocs.filter((d) => {
       if (type && d.type !== type) return false;
-      if (status && money(d).status !== status) return false;
+      const st = money(d).status;
+      if (status === 'open' ? !['due', 'partial', 'overdue'].includes(st) : status && st !== status) return false;
       if (!q) return true;
-      const hay = [formatNumber(d.type, d.number, settings), d.number, d.data && d.data.customer, d.data && d.data.customerPhone, d.date].join(' ').toLowerCase();
-      return hay.includes(q);
+      return searchText(d).includes(q);
     });
     $('#archive-body').innerHTML = rows.map((d) => docRow(d, `${payBtn(d)}
           <button class="btn small ghost" data-act="open">فتح</button>
           <button class="btn small ghost" data-act="print">طباعة</button>
           <button class="btn small ghost" data-act="copy">تكرار</button>
+          ${isCancelled(d) ? '<button class="btn small ghost" data-act="restore">إرجاع</button>' : '<button class="btn small ghost danger" data-act="cancel" title="يبقى بالأرشيف ولا يدخل بالحسابات">إلغاء</button>'}
           <button class="btn small ghost danger" data-act="delete">حذف</button>`)).join('');
     // مجموع المبالغ المعروضة لكل عملة ونوع
     const sums = {};
@@ -365,14 +402,38 @@
     $('#archive-empty').hidden = rows.length > 0;
   }
 
-  async function archiveAction(act, path) {
+  /** نص البحث: الرقم، الزبون، الهاتف، التاريخ، المبلغ، المواد ورموزها، أرقام المرجع */
+  function searchText(d) {
+    const x = d.data || {};
+    return [formatNumber(d.type, d.number, settings), d.number, x.customer, x.customerPhone, d.date, x.reference, x.ref, x.purpose,
+      Render.totals(d).total, ...(x.items || []).map((it) => [it.name, it.code].join(' ')),
+      ...(x.payments || []).map((p) => [p.method, p.ref].join(' '))].join(' ').toLowerCase();
+  }
+
+  async function archiveAction(act, path, btn) {
     const doc = archiveDocs.find((d) => d._path === path) || dashDocs.find((d) => d._path === path) || payDocs.find((d) => d._path === path);
     if (!doc) return;
     if (act === 'pay') return payInvoice(doc);
     if (act === 'payments') { payFilter = Number(doc.number); return switchTab('payments'); }
     if (act === 'open-invoice') {
-      if (doc._invoice && !doc._invoice.missing && await window.Issue.open(doc._invoice, false)) switchTab('issue');
+      const no = btn && btn.dataset.no ? Number(btn.dataset.no) : 0;
+      const x = no ? (doc._invoices || []).find((y) => y.inv && Number(y.inv.number) === no) : null;
+      const inv = x ? x.inv : doc._invoice;
+      if (inv && !inv.missing && await window.Issue.open(inv, false)) switchTab('issue');
       return;
+    }
+    if (act === 'cancel') {
+      const label = formatNumber(doc.type, doc.number, settings);
+      const reason = prompt(`إلغاء ${label}؟ يبقى بالأرشيف بحالة "ملغى" ولا يدخل بالحسابات.\nسبب الإلغاء (اختياري):`, '');
+      if (reason === null) return;
+      await St.setCancelled(doc, true, reason.trim());
+      toast('تم إلغاء ' + label);
+      return switchTab(currentTab);
+    }
+    if (act === 'restore') {
+      await St.setCancelled(doc, false);
+      toast('تم إرجاع المستند');
+      return switchTab(currentTab);
     }
     if (act === 'open' || act === 'copy') {
       if (await window.Issue.open(doc, act === 'copy')) switchTab('issue');
@@ -383,7 +444,8 @@
     } else if (act === 'delete') {
       const label = formatNumber(doc.type, doc.number, settings);
       const n = (doc._payments || []).length;
-      if (!confirm(`حذف المستند ${label} نهائياً؟` + (n ? `\nمرتبط بها ${n} وصل تسديد، تبقى الوصولات لكن بدون فاتورة.` : ''))) return;
+      if (!confirm(`حذف المستند ${label}؟` + (n ? `\nمرتبط بها ${n} وصل تسديد، تبقى الوصولات لكن بدون فاتورة.` : '') +
+        '\nالأفضل "إلغاء" المستند بدل حذفه. نسخة منه تبقى في سجل العمليات ويمكن إرجاعها من هناك.')) return;
       await St.deleteDocument(path);
       toast('تم حذف ' + label);
       switchTab(currentTab);
@@ -419,27 +481,30 @@
     }
     const rows = payDocs.filter((d) => {
       if (d.type !== 'receipt') return false;
-      if (payFilter) return Number(d.data.invoiceNo) === payFilter;
+      if (payFilter) return allocsOf(d).some((a) => a.invoiceNo === payFilter);
       if (link === 'linked' && !d._invoice) return false;
       if (link === 'free' && d._invoice) return false;
+      if (link === 'credit' && !(d._unallocated > 0.0001)) return false;
       if (!q) return true;
-      const hay = [formatNumber(d.type, d.number, settings), d.data.customer, d.date, d.data.purpose, d._invoice ? invLabel(d._invoice.number) : ''].join(' ').toLowerCase();
-      return hay.includes(q);
+      return (searchText(d) + ' ' + (d._invoices || []).map((x) => invLabel(x.missing ? x.number : x.inv.number)).join(' ')).toLowerCase().includes(q);
     });
     $('#pay-body').innerHTML = rows.map((d) => {
       const i = d._invoice;
-      const invCell = !i ? '<span class="muted">بدون فاتورة</span>'
-        : i.missing ? `<span class="muted">${esc(invLabel(i.number))} (محذوفة)</span>`
-        : `<button class="linkish strong" data-act="open-invoice">${esc(invLabel(i.number))}</button>`;
-      const left = i && !i.missing ? money(i) : null;
+      const list = d._invoices || [];
+      const invCell = isCancelled(d) ? '<span class="badge muted-badge">ملغى</span>'
+        : !list.length ? '<span class="muted">بدون فاتورة</span>'
+        : list.map((x) => x.missing ? `<span class="muted">${esc(invLabel(x.number))} (محذوفة)</span>`
+          : `<button class="linkish strong" data-act="open-invoice" data-no="${Number(x.inv.number)}">${esc(invLabel(x.inv.number))}</button>${list.length > 1 ? ` <small class="muted">${esc(formatMoney(x.amount, d.currency))}</small>` : ''}`).join('<br>') +
+          (d._unallocated > 0.0001 ? `<div class="link-note muted">غير موزّع: ${esc(formatMoney(d._unallocated, d.currency))}</div>` : '');
+      const left = list.length === 1 && i && !i.missing ? money(i) : null;
       return `
-      <tr data-path="${esc(d._path)}">
+      <tr data-path="${esc(d._path)}" class="${isCancelled(d) ? 'cancelled' : ''}">
         <td class="num strong">${esc(formatNumber(d.type, d.number, settings))}</td>
         <td class="num">${esc(d.date)}</td>
         <td class="strong">${esc(d.data.customer)}<div class="link-note muted">${esc(d.data.purpose || '')}</div></td>
-        <td class="money">${esc(formatMoney(Render.totals(d).total, d.currency))}</td>
+        <td class="money">${esc(formatMoney(Render.totals(d).total, d.currency))}<div class="link-note muted">${esc(Render.payText(d.data))}${d.data.ref ? ' · ' + esc(d.data.ref) : ''}</div></td>
         <td>${invCell}</td>
-        <td class="money">${left ? (left.due > 0.0001 ? `<span class="red">${esc(formatMoney(left.due, i.currency))}</span>` : '<span class="badge success">مسددة بالكامل</span>') : '—'}</td>
+        <td class="money">${left ? (left.due > 0.0001 ? `<span class="red">${esc(formatMoney(left.due, i.currency))}</span>` : '<span class="badge success">مسددة بالكامل</span>') : list.filter((x) => x.inv).length > 1 ? list.filter((x) => x.inv).map((x) => money(x.inv).due > 0.0001 ? `<span class="red">${esc(formatMoney(money(x.inv).due, x.inv.currency))}</span>` : '<span class="badge success">مسددة</span>').join('<br>') : '—'}</td>
         <td class="acts">
           <button class="btn small ghost" data-act="open">فتح</button>
           <button class="btn small ghost" data-act="print">طباعة</button>
@@ -448,7 +513,7 @@
       </tr>`;
     }).join('');
     const sums = {};
-    for (const d of rows) addTo(sums, d.currency, Render.totals(d).total);
+    for (const d of rows) addTo(sums, d.currency, money(d).total);
     const T = sumText(sums, settings.defaults.currency || 'IQD');
     $('#pay-foot').innerHTML = rows.length ? `<tr><td colspan="7" class="muted">${rows.length} وصل تسديد — المجموع <b dir="ltr">${esc(T.main)}</b> ${esc(T.rest)}</td></tr>` : '';
     $('#pay-empty').hidden = rows.length > 0;
@@ -487,7 +552,39 @@
     logoSymbol: 'AB', logoText: 'COMPANY',
   };
 
-  const pv = { templateId: null, type: 'sales', size: 'A4', blank: false, watermark: null, theme: null };
+  const pv = { templateId: null, type: 'sales', size: 'A4', blank: false, watermark: null, theme: null, design: null };
+  /** ألوان جاهزة سريعة: [رئيسي، غامق، إبراز] */
+  const SWATCHES = [
+    ['#174257', '#0d2836', '#245b73'], ['#0f766e', '#0f172a', '#14b8a6'], ['#1d4ed8', '#172554', '#f59e0b'],
+    ['#7c2d12', '#431407', '#ea580c'], ['#6d28d9', '#2e1065', '#a78bfa'], ['#be123c', '#4c0519', '#fb7185'],
+    ['#166534', '#052e16', '#84cc16'], ['#334155', '#0f172a', '#94a3b8'],
+  ];
+  function designNow() {
+    const base = { ...St.DEFAULT_DESIGN, ...(settings.design || {}) };
+    base.cols = { ...St.DEFAULT_DESIGN.cols, ...((settings.design && settings.design.cols) || {}) };
+    return pv.design || base;
+  }
+  function syncDesignInputs() {
+    const d = designNow();
+    $$('#design-form [data-d]').forEach((el) => {
+      if (el.type === 'checkbox') el.checked = d[el.dataset.d] !== false;
+      else el.value = d[el.dataset.d] == null || d[el.dataset.d] === '' ? (el.dataset.d === 'margin' ? 8 : '') : d[el.dataset.d];
+    });
+    $$('#design-form [data-col]').forEach((el) => { el.checked = !!d.cols[el.dataset.col]; });
+    $('#design-form [data-o="scale"]').textContent = (d.scale || 100) + '%';
+    $('#design-form [data-o="margin"]').textContent = d.margin ? d.margin + ' ملم' : 'افتراضي';
+  }
+  function readDesignInputs() {
+    const d = JSON.parse(JSON.stringify(designNow()));
+    $$('#design-form [data-d]').forEach((el) => {
+      const k = el.dataset.d;
+      d[k] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? Number(el.value) : el.value;
+    });
+    $$('#design-form [data-col]').forEach((el) => { d.cols[el.dataset.col] = el.checked; });
+    pv.design = d;
+    syncDesignInputs();
+    renderPreview();
+  }
   let templates = [];
 
   function previewSettings() {
@@ -510,8 +607,10 @@
     if (doc.currency === 'USD') {
       doc.data = { ...doc.data, items: (doc.data.items || []).map((it) => ({ ...it, price: it.price / 1500 })), discount: (doc.data.discount || 0) / 1500, paid: doc.data.paid / 1500, amount: (doc.data.amount || 0) / 1500 };
     }
-    const r = Render.renderPages(doc, tpl, s, { blank: pv.blank, watermark: pv.watermark });
+    if (pv.type === 'sales' && designNow().cols.code) doc.data = { ...doc.data, items: doc.data.items.map((it, i) => ({ ...it, code: 'P-10' + (i + 1) })) };
+    const r = Render.renderPages(doc, tpl, s, { blank: pv.blank, watermark: pv.watermark, design: designNow() });
     $('#pv-area').innerHTML = r.html;
+    Render.fitPreview($('#pv-area'));
     $('#pv-area').dataset.page = r.page;
     pv.last = r;
     $('#pv-note').textContent = empty ? 'المعاينة تعرض نصوصاً توضيحية. عبّئ بيانات الجهة من تبويب الإعدادات لتظهر بياناتك.' : '';
@@ -542,14 +641,16 @@
     if (!(tpl.types || []).includes(pv.type)) pv.type = tpl.types[0];
     $('#pv-type').value = pv.type;
     $('#pv-size').innerHTML = (tpl.sizes || []).map((k) => {
-      const hint = pv.type === 'receipt' ? (k === 'A4' ? ' — وصلين بالورقة' : ' — أفقي') : '';
-      return `<option value="${k}">${k}${hint}</option>`;
+      const hint = pv.type === 'receipt' ? (k === 'A4' || k === 'Letter' ? ' — وصلين بالورقة' : k === 'A5' ? ' — أفقي' : '') : '';
+      return `<option value="${k}">${esc(St.SIZE_LABELS[k] || k)}${hint}</option>`;
     }).join('');
     if (!(tpl.sizes || []).includes(pv.size)) pv.size = tpl.sizes[0];
     $('#pv-size').value = pv.size;
     $('#pv-blank').checked = pv.blank;
     $('#pv-watermark').checked = pv.watermark;
     syncThemeInputs();
+    syncDesignInputs();
+    $('#pv-swatches').innerHTML = SWATCHES.map((c, i) => `<button type="button" class="swatch" data-sw="${i}" title="تطبيق هذه الألوان" style="background:linear-gradient(135deg,${c[1]} 0 40%,${c[0]} 40% 75%,${c[2]} 75%)"></button>`).join('');
     renderPreview();
   }
 
@@ -583,11 +684,63 @@
     $('#prefix-fields').innerHTML = Object.entries(St.DOC_TYPES).map(([k, v]) =>
       `<label>عنوان ${esc(v.label)}<input name="titles.${k}"></label>` +
       `<label>بادئة ترقيم ${esc(v.label)}<input name="prefixes.${k}" dir="ltr"></label>`).join('');
-    $$('[name]', form).forEach((el) => { el.value = getPath(settings, el.name) || ''; });
+    $$('[name]', form).forEach((el) => { const v = getPath(settings, el.name); el.value = v == null ? '' : v; });
     $('#logo-preview').src = settings.company.logo || '';
     renderCloud();
     renderSecurity();
   }
+
+  // ---------- سجل العمليات ----------
+  const AUDIT_ACTIONS = {
+    create: 'إنشاء', update: 'تعديل', delete: 'حذف', cancel: 'إلغاء', restore: 'إرجاع من الإلغاء', undelete: 'إرجاع محذوف',
+    settings: 'الإعدادات', migrate: 'ترحيل البيانات', login: 'دخول', logout: 'خروج',
+  };
+  let auditRows = [];
+  async function renderAudit(reload = true) {
+    if (reload) {
+      auditRows = await St.listAudit();
+      const months = [...new Set(auditRows.map((r) => (r.at || '').slice(0, 7)))];
+      const sel = $('#audit-month'); const keep = sel.value;
+      sel.innerHTML = '<option value="">كل الأشهر</option>' + months.map((m) => `<option>${esc(m)}</option>`).join('');
+      sel.value = months.includes(keep) ? keep : '';
+      const as = $('#audit-action');
+      if (as.options.length <= 1) as.innerHTML = '<option value="">كل العمليات</option>' + Object.entries(AUDIT_ACTIONS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+    }
+    const q = $('#audit-search').value.trim().toLowerCase();
+    const month = $('#audit-month').value, action = $('#audit-action').value;
+    const rows = auditRows.filter((r) => (!month || (r.at || '').startsWith(month)) && (!action || r.action === action) &&
+      (!q || [r.label, r.user, r.path].join(' ').toLowerCase().includes(q)));
+    const amount = (d) => (d && d.type ? formatMoney(Render.totals(d).total, d.currency) : '');
+    const change = (r) => {
+      if (r.action === 'settings') return Object.keys(r.after || {}).map((k) => `${esc(k)}: <s>${esc(JSON.stringify((r.before || {})[k]))}</s> ← ${esc(JSON.stringify(r.after[k]))}`).join('<br>');
+      if (r.action === 'update' && r.before && r.after) {
+        const a = amount(r.before), b = amount(r.after);
+        return a !== b ? `المبلغ: <s>${esc(a)}</s> ← ${esc(b)}` : 'تعديل بيانات';
+      }
+      return esc(amount(r.after || r.before));
+    };
+    $('#audit-body').innerHTML = rows.slice(0, 500).map((r, i) => `
+      <tr data-i="${auditRows.indexOf(r)}">
+        <td class="num">${esc((r.at || '').replace('T', ' ').slice(0, 19))}</td>
+        <td><span class="badge ${['delete', 'cancel'].includes(r.action) ? 'danger' : r.action === 'create' ? 'success' : ''}">${esc(AUDIT_ACTIONS[r.action] || r.action)}</span></td>
+        <td class="strong">${esc(r.label || r.path)}</td>
+        <td class="muted" style="font-size:12px">${change(r)}</td>
+        <td dir="ltr" class="muted" style="font-size:12px">${esc(r.user || '')}</td>
+        <td class="acts">${r.action === 'delete' && r.before ? '<button class="btn small ghost" data-audit="undelete">إرجاع</button>' : ''}</td>
+      </tr>`).join('');
+    $('#audit-empty').hidden = rows.length > 0;
+    $('#audit-count').textContent = rows.length > 500 ? `آخر 500 من ${rows.length}` : `${rows.length} عملية`;
+  }
+  $('#audit-search').addEventListener('input', () => renderAudit(false));
+  $('#audit-month').addEventListener('change', () => renderAudit(false));
+  $('#audit-action').addEventListener('change', () => renderAudit(false));
+  $('#audit-body').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-audit]');
+    if (!b) return;
+    const r = auditRows[Number(b.closest('tr').dataset.i)];
+    try { await St.restoreDeleted(r); toast('تم إرجاع المستند للأرشيف'); renderAudit(true); }
+    catch (err) { toast(err.message, true); }
+  });
 
   // ---------- الأمان ----------
   function renderSecurity() {
@@ -659,7 +812,7 @@
   $('#dash-period').addEventListener('change', () => renderDashboard().catch((e) => toast(e.message, true)));
   $('#dash-recent').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path, b).catch((err) => toast(err.message, true));
   });
   $('#cust-search').addEventListener('input', () => renderCustomers(false));
   $('#cust-sort').addEventListener('change', () => renderCustomers(false));
@@ -686,7 +839,7 @@
   $('#archive-search').addEventListener('input', () => renderArchive(false));
   $('#archive-body').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path, b).catch((err) => toast(err.message, true));
   });
   $('#btn-archive-refresh').addEventListener('click', () => renderArchive(true));
   $('#pay-search').addEventListener('input', () => renderPayments(false));
@@ -696,7 +849,7 @@
   $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab="payments"]'); if (b) payFilter = 0; }, true);
   ['#pay-body', '#pay-open'].forEach((sel) => $(sel).addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path).catch((err) => toast(err.message, true));
+    if (b) archiveAction(b.dataset.act, b.closest('[data-path]').dataset.path, b).catch((err) => toast(err.message, true));
   }));
   $('#tpl-import').addEventListener('change', async (e) => {
     const f = e.target.files[0];
@@ -738,6 +891,26 @@
   $('#btn-tpl-save').addEventListener('click', () => saveTemplateTheme().catch((e) => toast(e.message, true)));
   $('#btn-tpl-reset').addEventListener('click', () => resetTemplateTheme().catch((e) => toast(e.message, true)));
   $('#btn-tpl-print').addEventListener('click', () => { if (pv.last) Render.print(pv.last); });
+  $('#pv-swatches').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sw]');
+    if (!b) return;
+    const c = SWATCHES[Number(b.dataset.sw)];
+    pv.theme = { primary: c[0], dark: c[1], accent: c[2] };
+    syncThemeInputs(); renderPreview();
+  });
+  $('#design-form').addEventListener('input', readDesignInputs);
+  $('#design-form').addEventListener('change', readDesignInputs);
+  $('#btn-design-save').addEventListener('click', async () => {
+    try {
+      const next = JSON.parse(JSON.stringify(settings));
+      next.design = designNow();
+      settings = await St.saveSettings(next);
+      pv.design = null;
+      toast('تم حفظ التصميم، يطبَّق على كل المستندات');
+      renderTemplates();
+    } catch (err) { toast(err.message, true); }
+  });
+  $('#btn-design-reset').addEventListener('click', () => { pv.design = JSON.parse(JSON.stringify(St.DEFAULT_DESIGN)); syncDesignInputs(); renderPreview(); });
   $('#settings-form').addEventListener('submit', (e) => saveSettingsForm(e).catch((err) => toast('تعذّر الحفظ: ' + err.message, true)));
   $('#logo-input').addEventListener('change', (e) => readLogo(e.target.files[0]));
   $('#btn-logo-clear').addEventListener('click', () => { $('#logo-preview').removeAttribute('src'); $('#logo-input').value = ''; });
@@ -745,7 +918,7 @@
 
   // للاختبار: تشغيل البرنامج على مجلد جاهز
   window.App = {
-    openApp, loadAll, money, invLabel, toast, formatNumber, formatMoney, switchTab, pv,
+    openApp, loadAll, money, allocsOf, invLabel, toast, formatNumber, formatMoney, switchTab, pv, isCancelled, todayStr,
     get settings() { return settings; },
     set settings(v) { settings = v; },
   };

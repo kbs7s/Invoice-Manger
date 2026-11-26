@@ -53,10 +53,10 @@
     const minRows = ctx.blank ? 24 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it) => `
       <tr><td>${h.esc(it.name)}</td><td>${h.esc(it.notes)}</td><td>${h.esc(it.qty)}</td>
-      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td></tr>`).join('');
+      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.lineFmt(it, ctx.currency)}</td></tr>`).join('');
     for (let i = its.length; i < minRows; i++) rows += '<tr><td></td><td></td><td></td><td></td><td></td></tr>';
     const tt = ctx.totals;
-    const extra = !ctx.blank && (tt.discount || tt.prevBalance || tt.paid !== tt.grand);
+    const extra = !ctx.blank && (tt.prevBalance || tt.paid !== tt.grand);
     return `
     <div class="doc">
       ${h.watermark(company, ctx.watermark)}
@@ -95,8 +95,7 @@
           <div class="lbl">المجموع</div>
           <div class="amt">
             <span class="num">${v(ctx, tt.net)}</span>
-            ${extra ? `<small><span>الخصم</span><span class="num">${v(ctx, tt.discount)}</span></small>
-              ${tt.prevBalance ? `<small><span>رصيد سابق</span><span class="num">${v(ctx, tt.prevBalance)}</span></small>` : ''}
+            ${extra ? `${tt.prevBalance ? `<small><span>رصيد سابق</span><span class="num">${v(ctx, tt.prevBalance)}</span></small>` : ''}
               <small><span>الواصل</span><span class="num">${v(ctx, tt.paid)}</span></small>
               <small><span>الباقي</span><span class="num">${v(ctx, tt.remaining)}</span></small>` : ''}
           </div>
@@ -143,7 +142,7 @@
     const minRows = ctx.blank ? 26 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it) => `
       <tr><td class="name">${h.esc(it.name)}</td><td>${h.esc(it.notes)}</td><td>${h.esc(it.qty)}</td>
-      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td></tr>`).join('');
+      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.lineFmt(it, ctx.currency)}</td></tr>`).join('');
     for (let i = its.length; i < minRows; i++) rows += '<tr><td></td><td></td><td></td><td></td><td></td></tr>';
     const tt = ctx.totals;
     return `
@@ -180,8 +179,7 @@
             <span class="words">${h.esc(ctx.words)}</span>
           </div>
           <table>
-            <tr><td class="k">Price</td><td class="num">${v(ctx, tt.subtotal)}</td></tr>
-            <tr><td class="k">Discount</td><td class="num">${v(ctx, tt.discount)}</td></tr>
+            <tr><td class="k">Price</td><td class="num">${v(ctx, tt.net)}</td></tr>
             ${tt.prevBalance ? `<tr><td class="k">Prev. Balance</td><td class="num">${v(ctx, tt.prevBalance)}</td></tr>` : ''}
             <tr><td class="k">Paid</td><td class="num">${v(ctx, tt.paid)}</td></tr>
             <tr><td class="k">Total cost</td><td class="num">${v(ctx, tt.grand)}</td></tr>
@@ -222,7 +220,7 @@
     const minRows = ctx.blank ? 14 : 0; // أسطر فارغة للنموذج اليدوي فقط
     let rows = its.map((it, i) => `
       <tr><td>${i + 1}</td><td class="name">${h.esc(it.name)}</td><td class="num">${h.esc(it.qty)}</td><td class="num">${h.esc(it.pack)}</td>
-      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.fmt(h.num(it.qty) * h.num(it.price), ctx.currency)}</td><td>${h.esc(it.notes)}</td></tr>`).join('');
+      <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.lineFmt(it, ctx.currency)}</td><td>${h.esc(it.notes)}</td></tr>`).join('');
     for (let i = its.length; i < minRows; i++) rows += `<tr><td>${ctx.blank ? i + 1 : ''}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
     const tt = ctx.totals;
     const count = its.reduce((s, it) => s + h.num(it.qty), 0);
@@ -278,21 +276,21 @@
   Store.registerTemplate({
     id: 'banner', name: 'الترويسة بالشعار',
     description: 'من ملف "المختص": شعار كبير وشريط تواصل، بيانات الزبون والتوصيل، وجدول بعناوين ملوّنة.',
-    types: ['sales'], sizes: ['A4', 'A5'],
+    types: ['sales'], sizes: ['A4', 'A5', 'Letter'],
     theme: { primary: '#2f5f8f', dark: '#1e3a5f', accent: '#2f5f8f' },
     css: bannerCSS, render: renderBanner,
   });
   Store.registerTemplate({
     id: 'bilingual', name: 'ثنائي اللغة',
     description: 'من ملف "Receipt وصولات": عنوان وسطي، عناوين حقول بالإنكليزي، وفوتر بالعنوان والمجاميع.',
-    types: ['sales'], sizes: ['A4', 'A5'],
+    types: ['sales'], sizes: ['A4', 'A5', 'Letter'],
     theme: { primary: '#1f2937', dark: '#111111', accent: '#7f7f7f' },
     css: bilingualCSS, render: renderBilingual,
   });
   Store.registerTemplate({
     id: 'boxed', name: 'المربعات',
     description: 'من ملف "الشراع": ترويسة بإطار مدوّر، عمود التعبئة، الطلب السابق والكلي، وتواقيع المجهز والمخزن.',
-    types: ['sales'], sizes: ['A4', 'A5'],
+    types: ['sales'], sizes: ['A4', 'A5', 'Letter'],
     itemFields: ['pack'],
     theme: { primary: '#e0141e', dark: '#1d4f91', accent: '#d9d9d9' },
     css: boxedCSS, render: renderBoxed,

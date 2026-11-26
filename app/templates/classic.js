@@ -108,18 +108,21 @@
     const sym = h.esc((window.Store.CURRENCIES[currency] || {}).symbol || '');
     const minRows = blank ? 10 : 0; // أسطر فارغة للنموذج اليدوي فقط
     const items = blank ? [] : (data.items || []);
+    const c = ctx.cols;
     let rows = items.map((it, i) => `
       <tr>
         <td style="width:32px">${i + 1}</td>
+        ${c.code ? `<td style="width:70px" class="num">${h.esc(it.code)}</td>` : ''}
         <td class="name">${h.esc(it.name)}</td>
         <td style="width:50px" class="num">${h.esc(it.qty)}</td>
-        <td style="width:60px">${h.esc(it.unit)}</td>
+        ${c.unit ? `<td style="width:60px">${h.esc(it.unit)}</td>` : ''}
         <td style="width:95px" class="num">${h.fmt(it.price, currency)}</td>
-        <td style="width:105px" class="num total">${h.fmt(h.num(it.qty) * h.num(it.price), currency)}</td>
-        <td class="note">${h.esc(it.notes)}</td>
+        <td style="width:105px" class="num total">${h.lineFmt(it, currency)}</td>
+        ${c.notes ? `<td class="note">${h.esc(it.notes)}</td>` : ''}
       </tr>`).join('');
+    const ncols = 4 + [c.code, c.unit, c.notes].filter(Boolean).length;
     for (let i = items.length; i < minRows; i++) {
-      rows += `<tr><td class="idx-empty">${i + 1}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      rows += `<tr><td class="idx-empty">${i + 1}</td>${'<td></td>'.repeat(ncols - 1)}</tr>`;
     }
     const v = (x) => (blank ? '' : h.money(x, currency));
     return `
@@ -135,9 +138,9 @@
         <div class="table-wrap">
           <table class="items">
             <thead><tr>
-              <th style="width:32px">ت</th><th>اسم المادة والمواصفات</th><th style="width:50px">الكمية</th>
-              <th style="width:60px">الوحدة</th><th style="width:95px">السعر المفرد (${sym})</th>
-              <th style="width:105px">المجموع (${sym})</th><th style="width:110px">ملاحظات</th>
+              <th style="width:32px">ت</th>${c.code ? '<th style="width:70px">الرمز</th>' : ''}<th>اسم المادة والمواصفات</th><th style="width:50px">الكمية</th>
+              ${c.unit ? '<th style="width:60px">الوحدة</th>' : ''}<th style="width:95px">السعر المفرد (${sym})</th>
+              <th style="width:105px">المجموع (${sym})</th>${c.notes ? '<th style="width:110px">ملاحظات</th>' : ''}
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -148,8 +151,8 @@
             ${data.terms ? `<div class="note"><b>شروط وملاحظات:</b> ${h.esc(data.terms)}</div>` : ''}
           </div>
           <table class="totals">
-            <tr><td>المجموع الكلي:</td><td class="v num">${v(t.subtotal)}</td></tr>
-            <tr><td>الخصم:</td><td class="v num">${v(t.discount)}</td></tr>
+            <tr><td>المجموع الكلي:</td><td class="v num">${v(t.net)}</td></tr>
+            ${!blank && t.prevBalance ? `<tr><td>رصيد سابق:</td><td class="v num">${v(t.prevBalance)}</td></tr>` : ''}
             <tr><td>الواصل (المستلم):</td><td class="v num green">${v(t.paid)}</td></tr>
             <tr><td>المتبقي (آجل):</td><td class="v num red">${v(t.remaining)}</td></tr>
           </table>
@@ -203,7 +206,7 @@
     name: 'الكلاسيكي',
     description: 'ترويسة بمربع شعار غامق، جدول بحدود كاملة، وشريط سفلي ملوّن.',
     types: ['sales', 'receipt'],
-    sizes: ['A4', 'A5'],
+    sizes: ['A4', 'A5', 'Letter'],
     theme: { primary: '#174257', dark: '#0d2836', accent: '#245b73' },
     css,
     render: (ctx) => (ctx.type === 'receipt' ? receipt(ctx) : sales(ctx)),

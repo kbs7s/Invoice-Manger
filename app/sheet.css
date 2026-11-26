@@ -6,7 +6,7 @@
   zoom: var(--zoom, 1);
   background: #fff;
   color: #11222d;
-  padding: 8mm 10mm;
+  padding: var(--pad, 8mm 10mm);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -18,8 +18,9 @@
   print-color-adjust: exact;
 }
 .sheet *, .sheet *::before, .sheet *::after { box-sizing: border-box; }
-.sheet.type-receipt { padding: 6mm 10mm; }
-.sheet-inner { flex: 1; display: flex; flex-direction: column; }
+.sheet.type-receipt { padding: var(--pad, 6mm 10mm); }
+/* حجم المحتوى: نكبّر/نصغّر كل شيء مع بقاء العرض مطابقاً للورقة */
+.sheet-inner { flex: 1; display: flex; flex-direction: column; zoom: var(--fs, 1); width: calc(100% / var(--fs, 1)); }
 .sheet .copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .sheet .copy > * { flex: 1; }
 .sheet .cut-line { border-top: 1.5px dashed #b6c2cc; margin: 4mm 0; position: relative; height: 0; }
@@ -34,7 +35,7 @@
 
 /* المعاينة على الشاشة */
 .sheet-preview { overflow: auto; background: #4b5563; background-image: radial-gradient(#6b7280 1.2px, transparent 1.2px); background-size: 20px 20px; padding: 24px; border-radius: 10px; }
-.sheet-preview .sheet { margin: 0 auto 24px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.sheet-preview .sheet { margin: 0 auto 24px; box-shadow: 0 10px 30px rgba(0,0,0,.4); zoom: calc(var(--zoom, 1) * var(--fit, 1)); }
 .sheet-preview .sheet:last-child { margin-bottom: 0; }
 
 /* الطباعة: تظهر فقط الأوراق الموضوعة في #print-root */
@@ -46,3 +47,22 @@
   #print-root .sheet { margin: 0; box-shadow: none; break-after: page; page-break-after: always; }
   #print-root .sheet:last-child { break-after: auto; page-break-after: auto; }
 }
+
+/* ---------- إعدادات التصميم العامة ---------- */
+.sheet.font-readex, .sheet.font-readex * { font-family: 'Readex Pro', 'Cairo', sans-serif !important; }
+.sheet.font-tahoma, .sheet.font-tahoma * { font-family: Tahoma, 'Segoe UI', Arial, sans-serif !important; }
+.sheet.font-naskh, .sheet.font-naskh * { font-family: 'Traditional Arabic', 'Simplified Arabic', 'Times New Roman', serif !important; }
+.sheet.font-tahoma .num, .sheet.font-naskh .num { font-family: Tahoma, Arial, sans-serif !important; }
+.sheet.logo-s img[class$="-img"] { max-height: 38px !important; max-width: 90px !important; }
+.sheet.logo-l img[class$="-img"] { max-height: 96px !important; max-width: 190px !important; }
+.sheet.logo-s [class$="-symbol"] { font-size: 22px !important; }
+.sheet.logo-l [class$="-symbol"] { font-size: 44px !important; }
+.sheet.tbl-striped table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--c-primary) 7%, #fff) !important; }
+.sheet.tbl-minimal table td, .sheet.tbl-minimal table th { border-left: 0 !important; border-right: 0 !important; }
+.sheet.tbl-minimal table td { border-top: 0 !important; }
+.sheet.no-signs .signs, .sheet.no-signs .rsign, .sheet.no-signs .sign { display: none !important; }
+.sheet.no-stamp .stamp:not(.tpl-boxed .stamp) { visibility: hidden !important; }
+.sheet .doc-msg { flex: 0 0 auto !important; text-align: center; font-size: 12px; font-weight: 700; color: var(--c-primary); padding: 4px 0 0; }
+.sheet.roll { padding: 3mm 2.5mm; min-height: 0; }
+.sheet.roll .copy > * { flex: 0 0 auto; }
+@media print { #print-root .sheet.roll { break-after: auto; } }
