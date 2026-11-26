@@ -112,6 +112,7 @@
         <button data-tab="payments"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>التسديدات</button>
         <button data-tab="customers"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>العملاء</button>
         <button data-tab="templates"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>القوالب</button>
+        <button data-tab="audit"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 4v5h5"/></svg>السجل</button>
         <button data-tab="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>الإعدادات</button>
       </nav>
       <div class="top-actions">
@@ -197,81 +198,111 @@
       <section class="panel" data-panel="issue" hidden>
         <div class="issue-layout">
           <form class="card issue-form" id="issue-form" autocomplete="off">
-            <div class="row between">
-              <h2 id="issue-title">مستند جديد</h2>
+            <div class="issue-head">
+              <div>
+                <h2 id="issue-title">مستند جديد</h2>
+                <p class="muted" id="issue-status"></p>
+              </div>
               <button type="button" class="btn small ghost" id="btn-new">+ جديد</button>
             </div>
-            <p class="muted" id="issue-status"></p>
             <p class="notice" id="issue-company-notice" hidden>بيانات الجهة (الاسم والشعار والعنوان) فارغة. <a data-goto="settings">عبّئها من الإعدادات</a> حتى تظهر على المستندات.</p>
 
-            <div class="form-grid two">
-              <label>نوع المستند<select id="f-type"></select></label>
-              <label>القالب<select id="f-template"></select></label>
-              <label>المقاس<select id="f-size"></select></label>
-              <label>العملة<select id="f-currency"></select></label>
-              <label>الرقم<input id="f-number" type="number" min="1" dir="ltr"></label>
-              <label>التاريخ<input id="f-date" type="date"></label>
-            </div>
+            <fieldset class="fs">
+              <legend><span class="fs-n">1</span> المستند</legend>
+              <div class="form-grid three">
+                <label>النوع<select id="f-type"></select></label>
+                <label>الرقم<input id="f-number" type="number" min="1" dir="ltr"></label>
+                <label>التاريخ<input id="f-date" type="date"></label>
+                <label data-for="sales">تاريخ الاستحقاق<input id="f-dueDate" type="date"></label>
+                <label>العملة<select id="f-currency"></select></label>
+                <label>رقم مرجع / طلب شراء<input id="f-reference" dir="auto"></label>
+              </div>
+              <div class="design-strip">
+                <label>القالب<select id="f-template"></select></label>
+                <label>المقاس<select id="f-size"></select></label>
+                <label class="check"><input type="checkbox" id="f-watermark"> علامة مائية</label>
+              </div>
+            </fieldset>
 
-            <div class="form-grid two">
-              <label class="span2">السيد / الجهة<input id="f-customer" list="customers-list"></label>
-              <label data-for="sales">عنوان الزبون / التوصيل<input id="f-customerAddress"></label>
-              <label data-for="sales">هاتف الزبون<input id="f-customerPhone" dir="ltr" inputmode="tel"></label>
-              <label>طريقة الدفع<input id="f-paymentMethod" list="pay-methods"></label>
-              <label data-for="receipt">نوع المعاملة<input id="f-transactionType" placeholder="تسديد / دفعة مقدمة..."></label>
-            </div>
+            <fieldset class="fs">
+              <legend><span class="fs-n">2</span> الزبون</legend>
+              <div class="form-grid two">
+                <label class="span2">السيد / الجهة<input id="f-customer" list="customers-list" placeholder="اكتب الاسم أو اختر من الزبائن السابقين"></label>
+                <label>الهاتف<input id="f-customerPhone" dir="ltr" inputmode="tel"></label>
+                <label>العنوان / التوصيل<input id="f-customerAddress"></label>
+                <label data-for="receipt">نوع المعاملة<input id="f-transactionType" placeholder="تسديد / دفعة مقدمة..."></label>
+              </div>
+            </fieldset>
 
             <!-- فاتورة مبيعات -->
-            <div data-for="sales">
-              <h3>المواد</h3>
+            <fieldset class="fs" data-for="sales">
+              <legend><span class="fs-n">3</span> المواد <small class="muted" id="items-count"></small></legend>
+              <div class="items-tools">
+                <label class="search small"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="item-quick" list="item-names" placeholder="بحث سريع عن مادة سابقة أو رمزها ثم Enter..."></label>
+                <span class="cols-toggle" id="items-cols"></span>
+              </div>
               <div class="items-editor" id="items-editor"></div>
               <button type="button" class="btn small ghost" id="btn-add-item">+ إضافة مادة</button>
-              <div class="form-grid two">
-                <label>الخصم<input id="f-discount" inputmode="decimal" dir="ltr"></label>
-                <label>الواصل (فارغ = كامل المبلغ)<input id="f-paid" inputmode="decimal" dir="ltr"></label>
+              <p class="muted small">Enter ينقل للسطر التالي ويضيف سطراً جديداً. ⧉ تكرار السطر، ↑↓ لتغيير الترتيب.</p>
+            </fieldset>
+
+            <fieldset class="fs" data-for="sales">
+              <legend><span class="fs-n">4</span> الحساب والدفع</legend>
+              <div class="form-grid three">
+                <label>خصم على الفاتورة<input id="f-discount" inputmode="decimal" dir="ltr" placeholder="مبلغ"></label>
+                <label>أو نسبة خصم %<input id="f-discountPct" inputmode="decimal" dir="ltr" placeholder="%"></label>
+                <label>أجور توصيل / إضافات<input id="f-charges" inputmode="decimal" dir="ltr"></label>
                 <label>رصيد / طلب سابق<input id="f-prevBalance" inputmode="decimal" dir="ltr"></label>
-                <label>شروط وملاحظات<input id="f-terms"></label>
+                <label class="span2">شروط وملاحظات<input id="f-terms"></label>
               </div>
-            </div>
+              <div class="pay-rows">
+                <div class="pay-rows-head"><b>المدفوع</b><small class="muted">اترك المبلغ فارغاً = مدفوعة بالكامل، اكتب 0 = آجل</small></div>
+                <div id="pay-rows"></div>
+                <button type="button" class="btn small ghost" id="btn-add-pay">+ طريقة دفع أخرى</button>
+              </div>
+            </fieldset>
 
             <!-- وصل قبض -->
-            <div data-for="receipt">
+            <fieldset class="fs" data-for="receipt">
+              <legend><span class="fs-n">3</span> المبلغ</legend>
               <div class="form-grid two">
                 <label class="span2">عن فاتورة (تسديد)
                   <select id="f-invoice"><option value="">بدون ربط بفاتورة</option></select>
                   <small class="muted" id="f-invoice-hint"></small>
                 </label>
-                <label>المبلغ<input id="f-amount" inputmode="decimal" dir="ltr"></label>
+                <label>المبلغ<input id="f-amount" inputmode="decimal" dir="ltr" class="big-num"></label>
+                <label>طريقة الدفع<select id="f-paymentMethod"></select></label>
+                <label>رقم المرجع (صك / حوالة)<input id="f-ref" dir="ltr"></label>
                 <label>وذلك عن<input id="f-purpose"></label>
                 <label class="span2">الملاحظات<input id="f-notes"></label>
               </div>
-            </div>
+            </fieldset>
 
-            <div class="form-grid two">
-              <label class="span2">المبلغ كتابةً (يُكتب تلقائياً، وتقدر تعدله)
-                <div class="row nowrap"><input id="f-amountWords" class="grow"><button type="button" class="btn small ghost" id="btn-words-auto" title="رجوع للكتابة التلقائية">تلقائي</button></div>
-              </label>
-              <label>اسم المستلم<input id="f-receiver"></label>
-              <label data-for="sales">المنظم / المحاسب<input id="f-accountant"></label>
-            </div>
+            <fieldset class="fs">
+              <legend><span class="fs-n" id="fs-last-n">5</span> الختام</legend>
+              <div class="form-grid two">
+                <label class="span2">المبلغ كتابةً (يُكتب تلقائياً، وتقدر تعدله)
+                  <div class="row nowrap"><input id="f-amountWords" class="grow"><button type="button" class="btn small ghost" id="btn-words-auto" title="رجوع للكتابة التلقائية">تلقائي</button></div>
+                </label>
+                <label>اسم المستلم<input id="f-receiver"></label>
+                <label data-for="sales">المنظم / المحاسب<input id="f-accountant"></label>
+              </div>
+            </fieldset>
 
             <div class="totals-box" id="totals-box"></div>
-
-            <div class="checks">
-              <label class="check"><input type="checkbox" id="f-watermark"> علامة مائية</label>
-            </div>
 
             <div class="row actions sticky-actions">
               <button type="submit" class="btn primary">💾 حفظ</button>
               <button type="button" class="btn primary" id="btn-save-print">حفظ وطباعة</button>
               <button type="button" class="btn ghost" id="btn-print-only">طباعة بدون حفظ</button>
+              <span class="kbd-hint muted">Ctrl+S حفظ · Ctrl+P طباعة</span>
             </div>
           </form>
           <div class="sheet-preview" id="issue-preview"></div>
         </div>
         <datalist id="customers-list"></datalist>
         <datalist id="item-names"></datalist>
-        <datalist id="pay-methods"><option value="نقداً"><option value="آجل"><option value="صك"><option value="تحويل مصرفي"><option value="بطاقة"></datalist>
+        
       </section>
 
       <!-- الأرشيف -->
@@ -287,6 +318,9 @@
                 <option value="paid">مدفوعة</option>
                 <option value="partial">دفعة جزئية</option>
                 <option value="due">آجل</option>
+                <option value="open">غير مسددة (كل المتبقي)</option>
+                <option value="overdue">متأخرة عن الاستحقاق</option>
+                <option value="cancelled">ملغاة</option>
               </select>
               <button class="btn ghost" id="btn-archive-refresh">تحديث</button>
             </div>
@@ -313,6 +347,7 @@
                 <option value="">كل الوصولات</option>
                 <option value="linked">مرتبطة بفاتورة</option>
                 <option value="free">بدون فاتورة</option>
+                <option value="credit">فيها مبلغ غير موزّع (رصيد للزبون)</option>
               </select>
             </div>
           </div>
@@ -336,6 +371,28 @@
           <h2 style="font-size:16px">فواتير عليها مبالغ متبقية</h2>
           <ul class="top-list" id="pay-open"></ul>
           <p class="muted empty" id="pay-open-empty" hidden>كل الفواتير مسددة بالكامل 👌</p>
+        </div>
+      </section>
+
+      <!-- سجل العمليات -->
+      <section class="panel" data-panel="audit" hidden>
+        <div class="card">
+          <div class="card-head">
+            <div><h2>سجل العمليات</h2><p class="muted">كل إنشاء وتعديل وإلغاء وحذف للمستندات وتغيير الإعدادات، مع الوقت والحساب. المحذوف يمكن إرجاعه من هنا.</p></div>
+            <div class="row">
+              <label class="search"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input id="audit-search" type="search" placeholder="بحث برقم المستند أو الاسم..."></label>
+              <select id="audit-month"></select>
+              <select id="audit-action"><option value="">كل العمليات</option></select>
+              <span class="muted" id="audit-count"></span>
+            </div>
+          </div>
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>الوقت</th><th>العملية</th><th>المستند</th><th>التغيير</th><th>الحساب</th><th></th></tr></thead>
+            <tbody id="audit-body"></tbody>
+          </table>
+          </div>
+          <p class="muted empty" id="audit-empty" hidden>لا توجد عمليات مسجلة بعد. يبدأ التسجيل من هذه النسخة.</p>
         </div>
       </section>
 
@@ -379,6 +436,7 @@
             </div>
 
             <h2>ألوان القالب</h2>
+            <div class="swatches" id="pv-swatches"></div>
             <div class="colors">
               <label>الرئيسي<input type="color" id="pv-c-primary"></label>
               <label>الغامق<input type="color" id="pv-c-dark"></label>
@@ -387,6 +445,33 @@
             <div class="row actions">
               <button class="btn primary" id="btn-tpl-save">حفظ الألوان</button>
               <button class="btn ghost" id="btn-tpl-reset">الألوان الأصلية</button>
+            </div>
+
+            <h2>التصميم والطباعة</h2>
+            <p class="muted small">يطبَّق على كل المستندات. المعاينة تتغير مباشرة.</p>
+            <div class="form-grid one design-form" id="design-form">
+              <label>الخط<select data-d="font">
+                <option value="cairo">Cairo (الافتراضي)</option><option value="readex">Readex Pro (حديث)</option>
+                <option value="tahoma">Tahoma (واضح للطباعة)</option><option value="naskh">نسخ تقليدي (Serif)</option></select></label>
+              <label>حجم الخط <output data-o="scale"></output><input type="range" data-d="scale" min="85" max="120" step="5"></label>
+              <label>حجم الشعار<select data-d="logo"><option value="s">صغير</option><option value="m">متوسط</option><option value="l">كبير</option></select></label>
+              <label>هوامش الورقة (ملم) <output data-o="margin"></output><input type="range" data-d="margin" min="4" max="20" step="1"></label>
+              <label>شكل الجدول<select data-d="table"><option value="bordered">حدود كاملة</option><option value="striped">أسطر ملونة</option><option value="minimal">خطوط أفقية فقط</option></select></label>
+              <fieldset class="cols-set"><legend>أعمدة جدول المواد</legend>
+                <label class="check"><input type="checkbox" data-col="code"> الرمز / SKU</label>
+                <label class="check"><input type="checkbox" data-col="unit"> الوحدة</label>
+                <label class="check"><input type="checkbox" data-col="notes"> الملاحظات</label>
+                <label class="check"><input type="checkbox" data-col="disc"> الخصم</label>
+                <label class="check"><input type="checkbox" data-col="tax"> الضريبة</label>
+                <small class="muted">الخصم والضريبة يظهران تلقائياً إذا وُجدت قيمة حتى لو أخفيتهما.</small>
+              </fieldset>
+              <label class="check"><input type="checkbox" data-d="signs"> مكان التوقيعات</label>
+              <label class="check"><input type="checkbox" data-d="stamp"> مكان الختم</label>
+              <label>رسالة أسفل المستند<input data-d="footerText" placeholder="مثلاً: شكراً لتعاملكم معنا"></label>
+            </div>
+            <div class="row actions">
+              <button class="btn primary" id="btn-design-save">حفظ التصميم</button>
+              <button class="btn ghost" id="btn-design-reset">الافتراضي</button>
             </div>
             <div class="row actions">
               <button class="btn ghost" id="btn-tpl-print">🖨️ طباعة المعاينة</button>
@@ -423,6 +508,18 @@
           <div class="form-grid">
             <label>العملة<select name="defaults.currency" id="sel-currency"></select></label>
             <label>مقاس الورق<select name="defaults.size" id="sel-size"></select></label>
+          </div>
+
+          <h2>الفواتير والدفع</h2>
+          <div class="form-grid">
+            <label>طرق الدفع (سطر لكل طريقة)<textarea name="payMethods" rows="5"></textarea></label>
+            <label>الضريبة
+              <select name="tax.enabled"><option value="">معطّلة (لا تظهر بالفاتورة)</option><option value="1">مفعّلة: عمود ضريبة لكل مادة</option></select>
+              <small class="muted">لا توجد نسبة مفروضة؛ تكتبها أنت حسب نشاطك.</small>
+            </label>
+            <label>اسم الضريبة على الفاتورة<input name="tax.label" placeholder="الضريبة"></label>
+            <label>النسبة الافتراضية %<input name="tax.rate" inputmode="decimal" dir="ltr" placeholder="مثلاً 15"></label>
+            <label>مدة الاستحقاق الافتراضية (أيام)<input name="invoice.dueDays" inputmode="numeric" dir="ltr" placeholder="فارغ = بدون"></label>
           </div>
 
           <h2>عناوين المستندات والترقيم</h2>
@@ -512,6 +609,7 @@ service cloud.firestore {
   <script src="app/templates/classic.js"></script>
   <script src="app/templates/modern.js"></script>
   <script src="app/templates/sheets.js"></script>
+  <script src="app/templates/pro.js"></script>
   <script src="app/app.js"></script>
   <script src="app/issue.js"></script>
 </body>

@@ -18,7 +18,7 @@
   const A = () => window.Auth;
   const PENDING_KEY = 'im-fb-pending';
   const SYNC_KEY = 'im-fb-sync';
-  const SYNCED = /^(workspace\.json|(settings|documents|templates)\/.+\.json)$/;
+  const SYNCED = /^(workspace\.json|(settings|documents|templates|audit)\/.+\.json)$/;
   const MAX_BYTES = 1000000;
 
   function load(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (e) { return fallback; } }
@@ -140,7 +140,7 @@
   }
   async function localPaths() {
     const out = [];
-    for (const p of ['workspace.json', ...(await S.walkJSON('settings')), ...(await S.walkJSON('templates')), ...(await S.walkJSON('documents'))]) {
+    for (const p of ['workspace.json', ...(await S.walkJSON('settings')), ...(await S.walkJSON('templates')), ...(await S.walkJSON('documents')), ...(await S.walkJSON('audit'))]) {
       if (tracked(p) && await S.exists(p)) out.push(p);
     }
     return out;
