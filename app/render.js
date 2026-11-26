@@ -185,13 +185,10 @@
     const dc = { ...((ctx.design && ctx.design.cols) || {}) };
     const its = ctx.blank ? [] : (ctx.data.items || []);
     const has = (k) => its.some((it) => it[k] !== '' && it[k] != null && Number(it[k]) !== 0);
-    const taxOn = !!(ctx.settings && ctx.settings.tax && ctx.settings.tax.enabled);
     return {
       code: !!dc.code || has('code'),
       unit: dc.unit !== false,
       notes: dc.notes !== false,
-      disc: !!dc.disc || has('disc') || has('discPct'),
-      tax: (taxOn && (!!dc.tax || ctx.blank)) || has('taxPct'),
     };
   }
   /** نص خصم السطر: "10%" أو المبلغ */
@@ -212,8 +209,6 @@
       ['الكمية', 'qty num', (it) => esc(it.qty)],
       c.unit && ['الوحدة', 'unit', (it) => esc(it.unit)],
       [`السعر (${sym})`, 'num', (it) => fmt(it.price, cur)],
-      c.disc && ['الخصم', 'num', (it) => discCell(it, cur)],
-      c.tax && [(ctx.settings.tax && ctx.settings.tax.label) || 'الضريبة', 'num', (it) => (num(it.taxPct) ? num(it.taxPct) + '%' : '')],
       [`المجموع (${sym})`, 'num total', (it) => fmt(line(it).total, cur)],
       c.notes && ['ملاحظات', 'note', (it) => esc(it.notes)],
     ].filter(Boolean);

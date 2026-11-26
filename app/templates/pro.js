@@ -3,7 +3,7 @@
  *  - minimal:   بسيط أنيق — أبيض، خطوط رفيعة، عنوان كبير ولون إبراز واحد
  *  - corporate: رسمي للشركات — شريط ترويسة ملوّن بعرض الصفحة، مربعات "إلى" و"تفاصيل"، بطاقة مجاميع
  *  - thermal:   وصل كاشير للطابعات الحرارية 80 ملم و58 ملم
- * كلها تدعم الأعمدة الاختيارية (الرمز، الخصم، الضريبة...) من إعدادات التصميم.
+ * كلها تدعم الأعمدة الاختيارية (الرمز، الوحدة، الملاحظات) من إعدادات التصميم.
  */
 (function () {
   'use strict';
@@ -12,17 +12,12 @@
   // أدوات مشتركة
   const V = (ctx, x) => (ctx.blank ? '' : ctx.h.money(x, ctx.currency));
   const T = (ctx, x) => (ctx.blank ? '' : ctx.h.esc(x));
-  const taxLabel = (ctx) => (ctx.settings.tax && ctx.settings.tax.label) || 'الضريبة';
 
   /** أسطر المجاميع للفاتورة: [عنوان، قيمة، صنف] — تظهر فقط الأسطر التي فيها قيمة */
   function totalsRows(ctx) {
     const t = ctx.totals;
-    if (ctx.blank) return [['المجموع', '', ''], ['الخصم', '', ''], ['الصافي', '', 'net'], ['الواصل', '', ''], ['المتبقي', '', '']];
-    const r = [['المجموع', V(ctx, t.subtotal), '']];
-    if (t.discount) r.push(['الخصم', '− ' + V(ctx, t.discount), '']);
-    if (t.charges) r.push(['أجور / إضافات', V(ctx, t.charges), '']);
-    if (t.tax) r.push([taxLabel(ctx), V(ctx, t.tax), '']);
-    r.push(['الصافي', V(ctx, t.net), 'net']);
+    if (ctx.blank) return [['المجموع', '', 'net'], ['الواصل', '', ''], ['المتبقي', '', '']];
+    const r = [['المجموع', V(ctx, t.net), 'net']];
     if (t.prevBalance) { r.push(['رصيد سابق', V(ctx, t.prevBalance), '']); r.push(['المطلوب الكلي', V(ctx, t.grand), '']); }
     r.push(['الواصل', V(ctx, t.paid), 'paid']);
     r.push(['المتبقي', V(ctx, t.remaining), t.remaining > 0.0001 ? 'rem' : 'ok']);
@@ -300,7 +295,7 @@
     const its = blank ? [] : (data.items || []);
     const rows = its.map((it) => {
       const l = h.line(it);
-      const extra = [it.code && h.esc(it.code), l.disc && 'خصم ' + h.discCell(it, cur), h.num(it.taxPct) && h.esc(taxLabel(ctx)) + ' ' + h.num(it.taxPct) + '%'].filter(Boolean).join(' · ');
+      const extra = it.code ? h.esc(it.code) : '';
       return `<tr><td class="n" colspan="3">${h.esc(it.name)}${extra ? `<small>${extra}</small>` : ''}</td></tr>
         <tr><td class="num" style="text-align:right">${h.esc(it.qty)} × ${h.fmt(it.price, cur)}</td><td></td><td class="num">${h.fmt(l.total, cur)}</td></tr>`;
     }).join('');

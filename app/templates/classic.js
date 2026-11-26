@@ -117,12 +117,10 @@
         <td style="width:50px" class="num">${h.esc(it.qty)}</td>
         ${c.unit ? `<td style="width:60px">${h.esc(it.unit)}</td>` : ''}
         <td style="width:95px" class="num">${h.fmt(it.price, currency)}</td>
-        ${c.disc ? `<td style="width:70px" class="num">${h.discCell(it, currency)}</td>` : ''}
-        ${c.tax ? `<td style="width:55px" class="num">${h.num(it.taxPct) ? h.num(it.taxPct) + '%' : ''}</td>` : ''}
         <td style="width:105px" class="num total">${h.lineFmt(it, currency)}</td>
         ${c.notes ? `<td class="note">${h.esc(it.notes)}</td>` : ''}
       </tr>`).join('');
-    const ncols = 4 + [c.code, c.unit, c.disc, c.tax, c.notes].filter(Boolean).length;
+    const ncols = 4 + [c.code, c.unit, c.notes].filter(Boolean).length;
     for (let i = items.length; i < minRows; i++) {
       rows += `<tr><td class="idx-empty">${i + 1}</td>${'<td></td>'.repeat(ncols - 1)}</tr>`;
     }
@@ -142,7 +140,6 @@
             <thead><tr>
               <th style="width:32px">ت</th>${c.code ? '<th style="width:70px">الرمز</th>' : ''}<th>اسم المادة والمواصفات</th><th style="width:50px">الكمية</th>
               ${c.unit ? '<th style="width:60px">الوحدة</th>' : ''}<th style="width:95px">السعر المفرد (${sym})</th>
-              ${c.disc ? '<th style="width:70px">الخصم</th>' : ''}${c.tax ? `<th style="width:55px">${h.esc((ctx.settings.tax && ctx.settings.tax.label) || 'الضريبة')}</th>` : ''}
               <th style="width:105px">المجموع (${sym})</th>${c.notes ? '<th style="width:110px">ملاحظات</th>' : ''}
             </tr></thead>
             <tbody>${rows}</tbody>
@@ -154,9 +151,7 @@
             ${data.terms ? `<div class="note"><b>شروط وملاحظات:</b> ${h.esc(data.terms)}</div>` : ''}
           </div>
           <table class="totals">
-            <tr><td>المجموع الكلي:</td><td class="v num">${v(t.subtotal)}</td></tr>
-            <tr><td>الخصم:</td><td class="v num">${v(t.discount)}</td></tr>
-            ${blank ? '' : h.extraRows(t, currency, (k, x) => `<tr><td>${k}:</td><td class="v num">${x}</td></tr>`, ctx.settings)}
+            <tr><td>المجموع الكلي:</td><td class="v num">${v(t.net)}</td></tr>
             ${!blank && t.prevBalance ? `<tr><td>رصيد سابق:</td><td class="v num">${v(t.prevBalance)}</td></tr>` : ''}
             <tr><td>الواصل (المستلم):</td><td class="v num green">${v(t.paid)}</td></tr>
             <tr><td>المتبقي (آجل):</td><td class="v num red">${v(t.remaining)}</td></tr>

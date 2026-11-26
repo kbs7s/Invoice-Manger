@@ -249,9 +249,6 @@
             <fieldset class="fs" data-for="sales">
               <legend><span class="fs-n">4</span> الحساب والدفع</legend>
               <div class="form-grid three">
-                <label>خصم على الفاتورة<input id="f-discount" inputmode="decimal" dir="ltr" placeholder="مبلغ"></label>
-                <label>أو نسبة خصم %<input id="f-discountPct" inputmode="decimal" dir="ltr" placeholder="%"></label>
-                <label>أجور توصيل / إضافات<input id="f-charges" inputmode="decimal" dir="ltr"></label>
                 <label>رصيد / طلب سابق<input id="f-prevBalance" inputmode="decimal" dir="ltr"></label>
                 <label class="span2">شروط وملاحظات<input id="f-terms"></label>
               </div>
@@ -461,9 +458,6 @@
                 <label class="check"><input type="checkbox" data-col="code"> الرمز / SKU</label>
                 <label class="check"><input type="checkbox" data-col="unit"> الوحدة</label>
                 <label class="check"><input type="checkbox" data-col="notes"> الملاحظات</label>
-                <label class="check"><input type="checkbox" data-col="disc"> الخصم</label>
-                <label class="check"><input type="checkbox" data-col="tax"> الضريبة</label>
-                <small class="muted">الخصم والضريبة يظهران تلقائياً إذا وُجدت قيمة حتى لو أخفيتهما.</small>
               </fieldset>
               <label class="check"><input type="checkbox" data-d="signs"> مكان التوقيعات</label>
               <label class="check"><input type="checkbox" data-d="stamp"> مكان الختم</label>
@@ -513,12 +507,6 @@
           <h2>الفواتير والدفع</h2>
           <div class="form-grid">
             <label>طرق الدفع (سطر لكل طريقة)<textarea name="payMethods" rows="5"></textarea></label>
-            <label>الضريبة
-              <select name="tax.enabled"><option value="">معطّلة (لا تظهر بالفاتورة)</option><option value="1">مفعّلة: عمود ضريبة لكل مادة</option></select>
-              <small class="muted">لا توجد نسبة مفروضة؛ تكتبها أنت حسب نشاطك.</small>
-            </label>
-            <label>اسم الضريبة على الفاتورة<input name="tax.label" placeholder="الضريبة"></label>
-            <label>النسبة الافتراضية %<input name="tax.rate" inputmode="decimal" dir="ltr" placeholder="مثلاً 15"></label>
             <label>مدة الاستحقاق الافتراضية (أيام)<input name="invoice.dueDays" inputmode="numeric" dir="ltr" placeholder="فارغ = بدون"></label>
           </div>
 

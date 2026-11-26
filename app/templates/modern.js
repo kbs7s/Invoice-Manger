@@ -115,12 +115,10 @@
         <td class="num">${h.esc(it.qty)}</td>
         ${cc.unit ? `<td>${h.esc(it.unit)}</td>` : ''}
         <td class="num">${h.fmt(it.price, currency)}</td>
-        ${cc.disc ? `<td class="num">${h.discCell(it, currency)}</td>` : ''}
-        ${cc.tax ? `<td class="num">${h.num(it.taxPct) ? h.num(it.taxPct) + '%' : ''}</td>` : ''}
         <td class="num total">${h.lineFmt(it, currency)}</td>
         ${cc.notes ? `<td class="note">${h.esc(it.notes)}</td>` : ''}
       </tr>`).join('');
-    const ncols = 4 + [cc.code, cc.unit, cc.disc, cc.tax, cc.notes].filter(Boolean).length;
+    const ncols = 4 + [cc.code, cc.unit, cc.notes].filter(Boolean).length;
     for (let i = items.length; i < minRows; i++) {
       const c = blank ? 'dots' : '';
       rows += `<tr><td class="idx-empty num">${i + 1}</td>${`<td class="${c}"></td>`.repeat(ncols - 1)}</tr>`;
@@ -131,7 +129,6 @@
           <thead><tr>
             <th style="width:34px">#</th>${cc.code ? '<th style="width:70px">الرمز</th>' : ''}<th class="name">اسم المادة والمواصفات</th><th style="width:55px">الكمية</th>
             ${cc.unit ? '<th style="width:65px">الوحدة</th>' : ''}<th style="width:95px">المفرد (${sym})</th>
-            ${cc.disc ? '<th style="width:70px">الخصم</th>' : ''}${cc.tax ? `<th style="width:55px">${h.esc((ctx.settings.tax && ctx.settings.tax.label) || 'الضريبة')}</th>` : ''}
             <th style="width:105px">الإجمالي (${sym})</th>${cc.notes ? '<th style="width:100px">ملاحظات</th>' : ''}
           </tr></thead>
           <tbody>${rows}</tbody>
@@ -163,14 +160,12 @@
     return `
       <div class="summary">
         <div>
-          <div class="wlabel">المبلغ الصافي كتابةً:</div>
+          <div class="wlabel">المبلغ كتابةً:</div>
           <div class="words">${h.esc(ctx.words)}</div>
           ${data.terms ? `<div class="terms">${h.esc(data.terms)}</div>` : ''}
         </div>
         <div class="sumblock">
-          <div><span>المجموع:</span><span class="num">${v(t.subtotal)}</span></div>
-          <div><span>الخصم:</span><span class="num">${v(t.discount)}</span></div>
-          ${blank ? '' : h.extraRows(t, currency, (k, x) => `<div><span>${k}:</span><span class="num">${x}</span></div>`, ctx.settings)}
+          <div><span>المجموع:</span><span class="num">${v(t.net)}</span></div>
           ${!blank && t.prevBalance ? `<div><span>رصيد سابق:</span><span class="num">${v(t.prevBalance)}</span></div>` : ''}
           <div class="paid"><span>الواصل (المقبوض):</span><span class="num">${v(t.paid)}</span></div>
           <div class="rem"><span>المتبقي في الذمة:</span><span class="num">${v(t.remaining)}</span></div>

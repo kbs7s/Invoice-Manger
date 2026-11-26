@@ -32,7 +32,6 @@
   function taxOn() { const t = settings().tax || {}; return !!t.enabled; }
   function blankItem() {
     const it = { code: '', name: '', qty: '', unit: '', pack: '', price: '', discPct: '', disc: '', notes: '' };
-    if (taxOn()) it.taxPct = settings().tax.rate || '';
     return it;
   }
   function blankPay(method) { return { method: method || St.payMethods(settings())[0], amount: '', ref: '' }; }
@@ -145,12 +144,10 @@
       code: pick('code', !!dc.code) || has('code'),
       unit: pick('unit', dc.unit !== false),
       pack: !!(tpl && (tpl.itemFields || []).includes('pack')),
-      disc: pick('disc', !!dc.disc) || has('discPct') || has('disc'),
-      tax: taxOn() || has('taxPct'),
       notes: pick('notes', dc.notes !== false),
     };
   }
-  const COL_LABELS = { code: 'الرمز', unit: 'الوحدة', disc: 'الخصم', notes: 'الملاحظات' };
+  const COL_LABELS = { code: 'الرمز', unit: 'الوحدة', notes: 'الملاحظات' };
   function discText(it) { return it.discPct !== '' && it.discPct != null && Number(it.discPct) ? it.discPct + '%' : (it.disc == null ? '' : it.disc); }
 
   function renderItems() {
@@ -159,10 +156,10 @@
     const ed = $('#items-editor');
     // العرض النسبي لكل عمود
     const spec = [['idx', '22px'], ['code', '.8fr'], ['name', '2.4fr'], ['qty', '.7fr'], ['unit', '.8fr'], ['pack', '.7fr'], ['price', '1.1fr'],
-      ['disc', '.8fr'], ['tax', '.6fr'], ['total', '1.1fr'], ['notes', '1.1fr'], ['acts', '64px']]
+['total', '1.1fr'], ['notes', '1.1fr'], ['acts', '64px']]
       .filter(([k]) => !(k in c) || c[k]);
     const grid = `grid-template-columns:${spec.map((x) => x[1]).join(' ')}`;
-    const head = { idx: '#', code: 'الرمز', name: 'المادة', qty: 'الكمية', unit: 'الوحدة', pack: 'التعبئة', price: 'السعر', disc: 'خصم', tax: 'ضريبة %', total: 'المجموع', notes: 'ملاحظات', acts: '' };
+    const head = { idx: '#', code: 'الرمز', name: 'المادة', qty: 'الكمية', unit: 'الوحدة', pack: 'التعبئة', price: 'السعر', total: 'المجموع', notes: 'ملاحظات', acts: '' };
     const cell = (k, it, i) => ({
       idx: `<span class="it-idx">${i + 1}</span>`,
       code: `<input data-k="code" value="${esc(it.code)}" dir="ltr" placeholder="SKU">`,
@@ -171,8 +168,6 @@
       unit: `<input data-k="unit" value="${esc(it.unit)}" list="units-list">`,
       pack: `<input data-k="pack" value="${esc(it.pack)}" inputmode="decimal" dir="ltr">`,
       price: `<input data-k="price" value="${esc(it.price)}" inputmode="decimal" dir="ltr">`,
-      disc: `<input data-k="discIn" value="${esc(discText(it))}" dir="ltr" placeholder="0 أو 10%" title="مبلغ، أو نسبة مثل 10%">`,
-      tax: `<input data-k="taxPct" value="${esc(it.taxPct == null ? '' : it.taxPct)}" inputmode="decimal" dir="ltr">`,
       total: `<span class="it-total num">${lineText(it)}</span>`,
       notes: `<input data-k="notes" value="${esc(it.notes)}">`,
       acts: `<span class="it-acts"><button type="button" class="it-btn" data-it="dup" title="تكرار السطر">⧉</button><button type="button" class="it-btn" data-it="up" title="للأعلى">↑</button><button type="button" class="it-btn" data-it="down" title="للأسفل">↓</button><button type="button" class="it-btn it-del" title="حذف">✕</button></span>`,
@@ -296,11 +291,7 @@
       $('#f-amountWords').placeholder = auto;
       const box = $('#totals-box');
       box.innerHTML = cur.type === 'sales'
-        ? `<div><span>المجموع</span><b>${R.money(t.subtotal, cur.currency)}</b></div>
-           ${t.discount ? `<div><span>الخصم</span><b>${R.money(t.discount, cur.currency)}</b></div>` : ''}
-           ${t.charges ? `<div><span>الإضافات</span><b>${R.money(t.charges, cur.currency)}</b></div>` : ''}
-           ${t.tax ? `<div><span>${esc((settings().tax && settings().tax.label) || 'الضريبة')}</span><b>${R.money(t.tax, cur.currency)}</b></div>` : ''}
-           <div class="net"><span>الصافي</span><b>${R.money(t.net, cur.currency)}</b></div>
+        ? `<div class="net"><span>المجموع</span><b>${R.money(t.net, cur.currency)}</b></div>
            ${t.prevBalance ? `<div><span>مع السابق</span><b>${R.money(t.grand, cur.currency)}</b></div>` : ''}
            <div><span>الواصل</span><b class="green">${R.money(t.paid, cur.currency)}</b></div>
            <div><span>المتبقي</span><b class="${t.remaining > 0 ? 'red' : ''}">${R.money(t.remaining, cur.currency)}</b></div>${linkedBox(t)}`
@@ -334,7 +325,6 @@
     if (cur.type === 'sales') {
       const bad = (cur.data.items || []).find((it) => it.name && (isNaN(R.num(it.qty)) || R.num(it.qty) < 0 || R.num(it.price) < 0));
       if (bad) return 'كمية أو سعر غير صحيح للمادة: ' + bad.name;
-      if (R.num(cur.data.discountPct) > 100) return 'نسبة الخصم أكبر من 100%';
       if (cur.data.dueDate && cur.data.dueDate < cur.date) return 'تاريخ الاستحقاق قبل تاريخ الفاتورة';
     }
     return '';
@@ -415,7 +405,7 @@
   }
 
   function fillFromCatalog(it, known, row) {
-    for (const k of ['code', 'name', 'unit', 'price', 'notes', 'pack', 'taxPct']) {
+    for (const k of ['code', 'name', 'unit', 'price', 'notes', 'pack']) {
       if ((it[k] === '' || it[k] == null) && known[k] !== '' && known[k] != null) {
         it[k] = known[k];
         const el = row && row.querySelector(`[data-k="${k}"]`); if (el) el.value = known[k];

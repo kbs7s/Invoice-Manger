@@ -56,7 +56,7 @@
       <td class="num">${h.fmt(it.price, ctx.currency)}</td><td class="num">${h.lineFmt(it, ctx.currency)}</td></tr>`).join('');
     for (let i = its.length; i < minRows; i++) rows += '<tr><td></td><td></td><td></td><td></td><td></td></tr>';
     const tt = ctx.totals;
-    const extra = !ctx.blank && (tt.discount || tt.prevBalance || tt.charges || tt.tax || tt.paid !== tt.grand);
+    const extra = !ctx.blank && (tt.prevBalance || tt.paid !== tt.grand);
     return `
     <div class="doc">
       ${h.watermark(company, ctx.watermark)}
@@ -95,9 +95,7 @@
           <div class="lbl">المجموع</div>
           <div class="amt">
             <span class="num">${v(ctx, tt.net)}</span>
-            ${extra ? `<small><span>الخصم</span><span class="num">${v(ctx, tt.discount)}</span></small>
-              ${h.extraRows(tt, ctx.currency, (k, x) => `<small><span>${k}</span><span class="num">${x}</span></small>`, ctx.settings)}
-              ${tt.prevBalance ? `<small><span>رصيد سابق</span><span class="num">${v(ctx, tt.prevBalance)}</span></small>` : ''}
+            ${extra ? `${tt.prevBalance ? `<small><span>رصيد سابق</span><span class="num">${v(ctx, tt.prevBalance)}</span></small>` : ''}
               <small><span>الواصل</span><span class="num">${v(ctx, tt.paid)}</span></small>
               <small><span>الباقي</span><span class="num">${v(ctx, tt.remaining)}</span></small>` : ''}
           </div>
@@ -181,9 +179,7 @@
             <span class="words">${h.esc(ctx.words)}</span>
           </div>
           <table>
-            <tr><td class="k">Price</td><td class="num">${v(ctx, tt.subtotal)}</td></tr>
-            <tr><td class="k">Discount</td><td class="num">${v(ctx, tt.discount)}</td></tr>
-            ${ctx.blank ? '' : h.extraRows(tt, ctx.currency, (k, x) => `<tr><td class="k">${k}</td><td class="num">${x}</td></tr>`, ctx.settings)}
+            <tr><td class="k">Price</td><td class="num">${v(ctx, tt.net)}</td></tr>
             ${tt.prevBalance ? `<tr><td class="k">Prev. Balance</td><td class="num">${v(ctx, tt.prevBalance)}</td></tr>` : ''}
             <tr><td class="k">Paid</td><td class="num">${v(ctx, tt.paid)}</td></tr>
             <tr><td class="k">Total cost</td><td class="num">${v(ctx, tt.grand)}</td></tr>
